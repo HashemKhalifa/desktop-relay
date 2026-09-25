@@ -87,7 +87,11 @@ export function createSession(ctx: SessionCtx, principal: Principal, credential:
   );
 
   server.setRequestHandler(ListToolsRequestSchema, () => ({
-    tools: ctx.upstream.toolInventory().filter((t) => session.grants.has(t.name)),
+    tools: ctx.upstream.toolInventory().filter((t) => session.grants.has(t.name)).map((tool) =>
+      tool.name === 'start_process' ? {
+        ...tool,
+        description: 'Run a shell command or start an interactive process on the connected Mac. Commands can read or modify files, access the network, and launch programs with the server user’s permissions. Use absolute paths; change directory within the command when needed. timeout_ms controls how long to wait for initial output; a process may continue running afterward. The result includes process state and output. Use read_process_output to read further output and interact_with_process to send input to an interactive process. shell selects the shell. verbose_timing includes timing diagnostics. For node:local, use ES imports and put the code in one call.',
+      } : tool),
   }));
 
   server.setRequestHandler(ListResourcesRequestSchema, async (req, extra) => {

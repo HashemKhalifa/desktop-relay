@@ -131,6 +131,11 @@ ChatGPT's MCP App form used here did not offer a custom authorization header, so
 path-only credential is required for this setup. Never paste the token into a chat,
 issue, log, or repository file.
 
+The relay exposes Desktop Commander's structured tool arguments directly; a device
+ID is unnecessary because this endpoint targets one Mac. The `start_process`
+description is concise and specific to this deployment. ChatGPT still controls
+action approvals, and its saved tool definitions may need refreshing after an update.
+
 ### After a Mac or daemon restart
 
 After logging in to macOS, the launch agents start the daemon and Cloudflare tunnel.
