@@ -5,6 +5,10 @@ relay. Run [Desktop Commander MCP](https://github.com/wonderwhy-er/desktopcomman
 on your own machine behind your own authenticated HTTPS endpoint, with no monthly
 tool-call quota.
 
+![Desktop Relay usage dashboard with sample daily and monthly activity](docs/images/dashboard.png)
+
+*Dashboard preview using sample data.*
+
 ## Architecture
 
 ```
