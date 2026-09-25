@@ -75,7 +75,7 @@ cat > "$CONFIG" <<EOF
   "uploadDeadlineMs": 10000,
   "maxBodyBytes": 16777216,
   "maxConcurrentPosts": 32,
-  "maxSessions": 64,
+  "maxSessions": 300,
   "logDir": "$LOGDIR"
 }
 EOF

@@ -56,7 +56,7 @@ function loadConfig(): Config {
     uploadDeadlineMs: raw.uploadDeadlineMs ?? 10_000,
     maxBodyBytes: raw.maxBodyBytes ?? 16 * 1024 * 1024,
     maxConcurrentPosts: raw.maxConcurrentPosts ?? 32,
-    maxSessions: raw.maxSessions ?? 64,
+    maxSessions: raw.maxSessions ?? 300,
     dashboardPort: raw.dashboardPort ?? 8789,
   };
   if (!Array.isArray(cfg.upstreamCmd) || cfg.upstreamCmd.length === 0 || !path.isAbsolute(cfg.upstreamCmd[0])) {
