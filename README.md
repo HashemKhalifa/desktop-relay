@@ -233,6 +233,22 @@ You do not need to run the installer again for a normal update.
 | `bin/dc-relayctl rotate --principal-id prin_…` | Rotate with 24-hour grace |
 | `bin/dc-relayctl revoke --principal-id prin_…` | Revoke credentials and close sessions |
 
+### Request rate limits
+
+Limits count HTTP requests, not tool calls: initialization, notifications, calls,
+and result-page reads each use allowance. Authenticated unsupported MCP GET probes
+return 405 without consuming it. New credentials default to 60 requests/minute.
+For an active ChatGPT account, use 300 requests/minute:
+
+```bash
+bin/dc-relayctl set-rate --principal-id prin_… --rate 300
+```
+
+This applies immediately and preserves the credential and sessions. The burst
+allowance is half the per-minute rate, rounded up, with a maximum of 150 requests.
+HTTP 429 includes `Retry-After` in seconds. The relay never automatically replays a
+tool call; check the outcome of any interrupted call before issuing another.
+
 ## Security model
 
 - The MCP listener binds to `127.0.0.1:8788`; the tunnel forwards to it and the

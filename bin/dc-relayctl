@@ -24,7 +24,7 @@ case "$cmd" in
     DESKTOP_RELAY_CONTROL="$SOCK" "${CTL[@]}" status 2>/dev/null || { echo "daemon: not reachable"; exit 1; }
     launchctl print "gui/$(id -u)/${LABEL}" 2>/dev/null | sed -n '1,8p' || true
     ;;
-  mint|rotate|revoke|list)
+  mint|rotate|revoke|list|set-rate)
     DESKTOP_RELAY_CONTROL="$SOCK" "${CTL[@]}" "$cmd" "$@"
     ;;
   url)
@@ -67,6 +67,7 @@ case "$cmd" in
 usage: dc-relayctl <command>
   status                              daemon + launchd state
   mint --name N --kind bearer|path-only --tools all|a,b,c [--rate N] [--allow-shared-history]
+  set-rate --principal-id P --rate N    update request allowance without rotating credentials
   rotate --principal-id P [--grace-hours N]
   revoke --principal-id P
   list                                principals + credential metadata

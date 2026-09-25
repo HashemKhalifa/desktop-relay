@@ -9,6 +9,7 @@ import { createSession, closeSession, type Session, type SessionCtx } from './se
 import { Upstream } from './upstream.ts';
 import { unknownGrantNames } from './policy.ts';
 import { ResultStore } from './results.ts';
+import { RateLimiter } from './rate-limit.ts';
 import { startDashboard } from './dashboard-server.ts';
 
 interface Config {
@@ -78,7 +79,7 @@ const storeRef = { current: store };
 
 const upstream = new Upstream(cfg.upstreamCmd[0], cfg.upstreamCmd.slice(1), cfg.upstreamCwd, PKG.version);
 const sessions = new Map<string, Session>();
-const buckets = new Map<string, { tokens: number; ts: number }>();
+const rateLimiter = new RateLimiter();
 let activePosts = 0;
 let authFailWindow: number[] = [];
 
@@ -149,17 +150,6 @@ function readBody(req: http.IncomingMessage, maxBytes: number, deadlineMs: numbe
   });
 }
 
-function bucketAllow(principalId: string, perMinute: number): boolean {
-  const now = Date.now();
-  let b = buckets.get(principalId);
-  if (!b) { b = { tokens: 30, ts: now }; buckets.set(principalId, b); }
-  b.tokens = Math.min(30, b.tokens + ((now - b.ts) / 60_000) * perMinute);
-  b.ts = now;
-  if (b.tokens < 1) return false;
-  b.tokens -= 1;
-  return true;
-}
-
 function findInitialize(body: unknown): boolean {
   const msgs = Array.isArray(body) ? body : [body];
   return msgs.some((m) => m && typeof m === 'object' && (m as { method?: string }).method === 'initialize');
@@ -200,7 +190,15 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
     status: res.statusCode,
   }));
 
-  if (!bucketAllow(principal.id, principal.ratePerMinute)) { send(res, 429); return; }
+  if (route === 'mcp' && req.method === 'GET') {
+    res.writeHead(405, { allow: 'POST, DELETE' }); res.end(); return;
+  }
+  const retryAfter = rateLimiter.take(principal.id, principal.ratePerMinute);
+  if (retryAfter > 0) {
+    res.setHeader('retry-after', String(retryAfter));
+    send(res, 429);
+    return;
+  }
 
   if (route === 'healthz') {
     send(res, 200, {
@@ -213,8 +211,6 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
     });
     return;
   }
-
-  if (req.method === 'GET') { res.writeHead(405, { allow: 'POST, DELETE' }); res.end(); return; }
 
   const sidHeader = req.headers['mcp-session-id'];
   const sessionId = typeof sidHeader === 'string' ? sidHeader : undefined;
@@ -296,6 +292,19 @@ function applyControl(op: Record<string, unknown>): object {
       });
       saveAndSwap();
       return { ok: true, principalId: out.principal.id, credentialId: out.credential.id, secret: out.secret };
+    }
+    case 'set-rate': {
+      const principal = next.principals.find((p) => p.id === op.principalId && p.enabled);
+      if (!principal) return { ok: false, error: 'unknown or disabled principal' };
+      const rate = op.ratePerMinute;
+      if (typeof rate !== 'number' || !Number.isSafeInteger(rate) || rate < 1) {
+        return { ok: false, error: 'rate must be a positive integer' };
+      }
+      principal.ratePerMinute = rate;
+      saveAndSwap();
+      rateLimiter.reset(principal.id);
+      audit('principal.rate', { principalId: principal.id, ratePerMinute: rate });
+      return { ok: true, principalId: principal.id, ratePerMinute: rate };
     }
     case 'rotate': {
       const out = creds.rotate(next, String(op.principalId), Number(op.graceMs ?? 24 * 3600 * 1000));

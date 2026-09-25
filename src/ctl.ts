@@ -35,6 +35,7 @@ function parseArgs(argv: string[]): Record<string, unknown> {
 
 const USAGE = `usage: ctl <op> [flags]
   mint   --name N --kind bearer|path-only --tools all|a,b,c [--rate N] [--allow-shared-history]
+  set-rate --principal-id P --rate N
   rotate --principal-id P [--grace-hours N]
   revoke --principal-id P
   list

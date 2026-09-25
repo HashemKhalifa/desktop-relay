@@ -118,6 +118,9 @@ export interface MintOpts {
 // Returns the plaintext secret exactly once — it exists only in this return value
 // and the caller's output; the store keeps only the hash.
 export function mint(store: Store, opts: MintOpts): { principal: Principal; credential: Credential; secret: string } {
+  if (opts.ratePerMinute !== undefined && (!Number.isSafeInteger(opts.ratePerMinute) || opts.ratePerMinute < 1)) {
+    throw new Error('rate must be a positive integer');
+  }
   const secret = newSecret();
   const principal: Principal = {
     id: newId('prin'),
