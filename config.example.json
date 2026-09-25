@@ -1,0 +1,8 @@
+{
+  "edge": "ngrok",
+  "portProxy": 8788,
+  "portGateway": 8787,
+  "upstreamCmd": "npx -y @wonderwhy-er/desktop-commander@latest",
+  "tokenPath": "~/.config/desktop-relay/token",
+  "publicBaseUrl": "https://<your-static>.ngrok-free.app"
+}
