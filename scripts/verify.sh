@@ -50,6 +50,14 @@ LISTA=$(curl -s -X POST "$BASE/mcp" "${MCP_HEADERS[@]}" -H "authorization: Beare
 echo "$LISTA" | grep -q 'start_process' && ok "tools/list contains start_process" || bad "tools/list missing start_process"
 echo "$LISTA" | grep -q 'set_config_value' && bad "DENY_REMOTE leaked into tools/list" || ok "set_config_value absent from list"
 
+RESOURCE=$(curl -s -X POST "$BASE/mcp" "${MCP_HEADERS[@]}" -H "authorization: Bearer $TOKEN" -H "mcp-session-id: $SIDA" \
+  -d '{"jsonrpc":"2.0","id":5,"method":"resources/read","params":{"uri":"ui://desktop-commander/file-preview"}}')
+echo "$RESOURCE" | grep -q 'text/html;profile=mcp-app' && ok "advertised UI resource readable" || bad "advertised UI resource unavailable"
+
+DENIED_RESOURCE=$(curl -s -X POST "$BASE/mcp" "${MCP_HEADERS[@]}" -H "authorization: Bearer $TOKEN" -H "mcp-session-id: $SIDA" \
+  -d '{"jsonrpc":"2.0","id":6,"method":"resources/read","params":{"uri":"ui://desktop-commander/unadvertised"}}')
+echo "$DENIED_RESOURCE" | grep -q 'resource not available' && ok "unadvertised resource denied" || bad "unadvertised resource was readable"
+
 START=$(curl -s -X POST "$BASE/mcp" "${MCP_HEADERS[@]}" -H "authorization: Bearer $TOKEN" -H "mcp-session-id: $SIDA" \
   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"start_process","arguments":{"command":"echo relay-shared-child && sleep 30","timeout_ms":2000}}}')
 echo "$START" | grep -q '"result"' && ok "A: start_process dispatched" || bad "A: start_process failed: $(echo "$START" | head -c 200)"

@@ -5,8 +5,10 @@ import {
   CallToolRequestSchema,
   CompatibilityCallToolResultSchema,
   ErrorCode,
+  ListResourcesRequestSchema,
   ListToolsRequestSchema,
   McpError,
+  ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { credentialValid, type Credential, type Principal, type Store } from './creds.ts';
 import { grantedToolNames } from './policy.ts';
@@ -31,6 +33,19 @@ export interface SessionCtx {
   rpcDeadlineMs: number;
   maxSessions: number;
   audit: (event: string, fields: Record<string, unknown>) => void;
+}
+
+function grantedResourceUris(ctx: SessionCtx, grants: Set<string>): Set<string> {
+  const uris = new Set<string>();
+  for (const tool of ctx.upstream.toolInventory()) {
+    if (!grants.has(tool.name)) continue;
+    const meta = tool._meta as Record<string, unknown> | undefined;
+    const ui = meta?.ui as Record<string, unknown> | undefined;
+    for (const uri of [meta?.['ui/resourceUri'], meta?.['openai/outputTemplate'], ui?.resourceUri]) {
+      if (typeof uri === 'string') uris.add(uri);
+    }
+  }
+  return uris;
 }
 
 // One SDK Server + transport per downstream protocol session. The relay owns
@@ -68,12 +83,30 @@ export function createSession(ctx: SessionCtx, principal: Principal, credential:
 
   const server = new Server(
     { name: 'desktop-relay', version: ctx.version },
-    { capabilities: { tools: {} } },
+    { capabilities: { tools: {}, resources: {} } },
   );
 
   server.setRequestHandler(ListToolsRequestSchema, () => ({
     tools: ctx.upstream.toolInventory().filter((t) => session.grants.has(t.name)),
   }));
+
+  server.setRequestHandler(ListResourcesRequestSchema, async (req, extra) => {
+    const { client, generation } = ctx.upstream.getClient();
+    const page = await client.listResources(req.params ?? {}, { signal: extra.signal, timeout: ctx.rpcDeadlineMs });
+    if (generation !== ctx.upstream.generation) throw new McpError(ErrorCode.InvalidRequest, 'upstream changed');
+    const allowed = grantedResourceUris(ctx, session.grants);
+    return { ...page, resources: page.resources.filter((resource) => allowed.has(resource.uri)) };
+  });
+
+  server.setRequestHandler(ReadResourceRequestSchema, async (req, extra) => {
+    if (!grantedResourceUris(ctx, session.grants).has(req.params.uri)) {
+      throw new McpError(ErrorCode.InvalidRequest, 'resource not available');
+    }
+    const { client, generation } = ctx.upstream.getClient();
+    const result = await client.readResource(req.params, { signal: extra.signal, timeout: ctx.rpcDeadlineMs });
+    if (generation !== ctx.upstream.generation) throw new McpError(ErrorCode.InvalidRequest, 'upstream changed');
+    return result;
+  });
 
   server.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
     const name = req.params.name;

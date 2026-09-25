@@ -25,7 +25,7 @@ remote MCP client
   -> tunnel agent on your Mac              ngrok | cloudflared | ssh -R
   -> 127.0.0.1:8788  src/daemon.ts         auth + limits + audit
        |-- one SDK Server + transport per client session   (session.ts)
-       |-- policy-checked tools/list + tools/call handlers
+       |-- policy-checked tools and advertised UI resources (session.ts)
        |-- one SDK Client + one desktop-commander child    (upstream.ts)
   -> desktop-commander (stdio child)       the OSS MCP server
 ```
@@ -46,7 +46,7 @@ git clone <this repo> && cd desktop-relay
 npm ci
 ./install.sh --edge none                     # local only
 bin/dc-relayctl mint --name me --kind bearer --tools all
-scripts/verify.sh                            # acceptance: 15 checks
+scripts/verify.sh                            # acceptance: 17 checks
 ```
 
 Public edge (only after `verify.sh` passes):
@@ -56,6 +56,41 @@ Public edge (only after `verify.sh` passes):
 # or: --edge cloudflare --domain mcp.example.com   (needs a named tunnel)
 # or: --edge vps-ssh --vps shivo@dedicated --domain mcp.example.com
 ```
+
+### Cloudflare named tunnel
+
+On the Mac, log in to Cloudflare and create the tunnel and DNS route once:
+
+```bash
+cloudflared tunnel login
+cloudflared tunnel create desktop-relay
+cloudflared tunnel route dns desktop-relay dc.khalifah.uk
+```
+
+Put the tunnel UUID returned by `create` into `~/.cloudflared/config.yml`:
+
+```yaml
+tunnel: <UUID>
+credentials-file: /Users/<mac-user>/.cloudflared/<UUID>.json
+ingress:
+  - hostname: dc.khalifah.uk
+    service: http://127.0.0.1:8788
+  - service: http_status:404
+```
+
+Keep the certificate, tunnel credentials, and config under `~/.cloudflared`, outside
+the repo. Then validate and install the launch agents:
+
+```bash
+cloudflared tunnel ingress validate
+./install.sh --edge cloudflare --domain dc.khalifah.uk
+scripts/verify.sh https://dc.khalifah.uk
+bin/dc-relayctl doctor
+```
+
+The daemon and tunnel run as macOS LaunchAgents after login. Both restart on failure;
+the daemon listens only on `127.0.0.1:8788`. The hostname above is this installation's
+public endpoint; use your own hostname for another installation.
 
 ## Using it
 
@@ -72,6 +107,50 @@ Header-less clients get a `path-only` credential — the URL path itself is the 
 bin/dc-relayctl mint --name phone --kind path-only --tools all
 # -> https://<edge>/<pathToken>/mcp
 ```
+
+### ChatGPT
+
+This installation is already connected in ChatGPT as **Desktop Relay**. In a new
+chat, click **+** in the composer, choose **Desktop Relay**, and ask it to use that
+app. The paid **Remote Desktop Commander** app is separate; choose **Desktop Relay**
+for the self-hosted connection.
+
+To set up another ChatGPT account or replace a revoked credential:
+
+1. Run `bin/dc-relayctl mint --name chatgpt --kind path-only --tools all` on the Mac.
+   Save the returned secret privately; it is displayed only when minted.
+2. In ChatGPT, open **Customize → Plugins → Add → Create MCP App**. Name it **Desktop
+   Relay**. Set **Server URL** to `https://dc.khalifah.uk/<pathToken>/mcp` and
+   **Authentication** to **No authentication**. The path token authenticates the
+   request; treat the complete URL as a secret. Confirm the access warning, create
+   the app, and connect it.
+3. Start a fresh chat, select **Desktop Relay** from **+**, and try a harmless tool
+   call. Keep the paid app until this real-client check succeeds.
+
+ChatGPT's MCP App form used here did not offer a custom authorization header, so the
+path-only credential is required for this setup. Never paste the token into a chat,
+issue, log, or repository file.
+
+### After a Mac or daemon restart
+
+After logging in to macOS, the launch agents start the daemon and Cloudflare tunnel.
+The existing ChatGPT app and path credential remain configured; select **Desktop
+Relay** in a new chat and use it normally. An MCP session interrupted by a restart
+must initialize again. If a tool call was interrupted, its outcome may be unknown:
+check its effect before deciding whether to issue a new call.
+
+If ChatGPT cannot connect, check the live service and tunnel:
+
+```bash
+bin/dc-relayctl status
+bin/dc-relayctl doctor
+cloudflared tunnel info desktop-relay
+scripts/verify.sh https://dc.khalifah.uk
+```
+
+`doctor` should show `127.0.0.1:8788` listening and no LAN listener. If the daemon
+is stopped, run `bin/dc-relayctl restart`; if the Mac is asleep, offline, or logged
+out, the public endpoint may be unavailable until it wakes and the user logs in.
 
 Lifecycle:
 
