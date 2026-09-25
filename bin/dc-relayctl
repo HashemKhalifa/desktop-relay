@@ -41,9 +41,11 @@ case "$cmd" in
     ;;
   dashboard)
     [ "${1:-}" = "" ] || [ "$1" = "--no-open" ] || die "usage: dc-relayctl dashboard [--no-open]"
-    dashboard_path="$(DESKTOP_RELAY_CONFIG="$CONFIG" node "${REPO}/src/dashboard.ts")"
-    echo "$dashboard_path"
-    [ "${1:-}" = "--no-open" ] || open "$dashboard_path"
+    if [ "${1:-}" = "--no-open" ]; then
+      DESKTOP_RELAY_CONFIG="$CONFIG" node "${REPO}/src/dashboard.ts"
+    else
+      DESKTOP_RELAY_CONFIG="$CONFIG" node "${REPO}/src/dashboard.ts" --live
+    fi
     ;;
   restart)
     launchctl kickstart -k "gui/$(id -u)/${LABEL}" && echo "restarted ${LABEL}"
@@ -70,7 +72,7 @@ usage: dc-relayctl <command>
   list                                principals + credential metadata
   url                                 endpoint shapes for clients
   logs | audit                        tail daemon logs / audit trail
-  dashboard [--no-open]               refresh local daily/monthly usage dashboard
+  dashboard [--no-open]               open live usage dashboard (or export a snapshot)
   restart                             kickstart the daemon
   doctor                              listener ownership + LAN exposure check
 EOF

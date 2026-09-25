@@ -61,6 +61,7 @@ echo "$DENIED_RESOURCE" | grep -q 'resource not available' && ok "unadvertised r
 START=$(curl -s -X POST "$BASE/mcp" "${MCP_HEADERS[@]}" -H "authorization: Bearer $TOKEN" -H "mcp-session-id: $SIDA" \
   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"start_process","arguments":{"command":"echo relay-shared-child && sleep 30","timeout_ms":2000}}}')
 echo "$START" | grep -q '"result"' && ok "A: start_process dispatched" || bad "A: start_process failed: $(echo "$START" | head -c 200)"
+PROCESS_PID=$(echo "$START" | sed -n 's/.*Process started with PID \([0-9][0-9]*\).*/\1/p')
 
 echo "== session B: second client, same child =="
 INITB=$(curl -s -D - -X POST "$BASE/mcp" "${MCP_HEADERS[@]}" -H "authorization: Bearer $TOKEN" \
@@ -71,8 +72,8 @@ curl -s -o /dev/null -X POST "$BASE/mcp" "${MCP_HEADERS[@]}" -H "authorization: 
   -d '{"jsonrpc":"2.0","method":"notifications/initialized"}'
 
 PROCS=$(curl -s -X POST "$BASE/mcp" "${MCP_HEADERS[@]}" -H "authorization: Bearer $TOKEN" -H "mcp-session-id: $SIDB" \
-  -d '{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"list_processes","arguments":{}}}')
-echo "$PROCS" | grep -q 'sleep 30' && ok "B sees A's process (shared child)" || bad "B cannot see A's process: $(echo "$PROCS" | head -c 200)"
+  -d "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"read_process_output\",\"arguments\":{\"pid\":${PROCESS_PID:-0},\"offset\":-10,\"length\":10,\"timeout_ms\":100}}}")
+echo "$PROCS" | grep -q 'relay-shared-child' && ok "B reads A's process output (shared child)" || bad "B cannot read A's process output: $(echo "$PROCS" | head -c 200)"
 
 echo "== policy + method surface =="
 DENY=$(curl -s -X POST "$BASE/mcp" "${MCP_HEADERS[@]}" -H "authorization: Bearer $TOKEN" -H "mcp-session-id: $SIDB" \

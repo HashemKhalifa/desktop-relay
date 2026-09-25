@@ -8,6 +8,8 @@ import * as creds from './creds.ts';
 import { createSession, closeSession, type Session, type SessionCtx } from './session.ts';
 import { Upstream } from './upstream.ts';
 import { unknownGrantNames } from './policy.ts';
+import { ResultStore } from './results.ts';
+import { startDashboard } from './dashboard-server.ts';
 
 interface Config {
   listenHost: string;
@@ -25,6 +27,7 @@ interface Config {
   maxBodyBytes: number;
   maxConcurrentPosts: number;
   maxSessions: number;
+  dashboardPort: number;
 }
 
 const PKG = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
@@ -54,6 +57,7 @@ function loadConfig(): Config {
     maxBodyBytes: raw.maxBodyBytes ?? 16 * 1024 * 1024,
     maxConcurrentPosts: raw.maxConcurrentPosts ?? 32,
     maxSessions: raw.maxSessions ?? 64,
+    dashboardPort: raw.dashboardPort ?? 8789,
   };
   if (!Array.isArray(cfg.upstreamCmd) || cfg.upstreamCmd.length === 0 || !path.isAbsolute(cfg.upstreamCmd[0])) {
     throw new Error('config.upstreamCmd must be a non-empty array whose first element is an absolute path');
@@ -112,6 +116,7 @@ const ctx: SessionCtx = {
   version: PKG.version,
   rpcDeadlineMs: cfg.rpcDeadlineMs,
   maxSessions: cfg.maxSessions,
+  results: new ResultStore(),
   audit,
 };
 
@@ -290,6 +295,7 @@ function applyControl(op: Record<string, unknown>): object {
       for (const sess of [...sessions.values()]) {
         if (sess.principalId === op.principalId) closeSession(ctx, sess);
       }
+      ctx.results.revoke(String(op.principalId));
       audit('principal.revoked', { principalId: op.principalId });
       return { ok: true };
     }
@@ -370,6 +376,10 @@ const httpServer = http.createServer((req, res) => {
   });
 });
 const controlServer = startControlSocket();
+const dashboardServer = startDashboard({ directory: path.dirname(CONFIG_PATH), auditPath: cfg.auditPath, port: cfg.dashboardPort }, () => ({
+  upstream: upstream.state, sessions: sessions.size, activePosts, pid: process.pid, generation: upstream.generation,
+}));
+dashboardServer.on('error', (error) => console.error('dashboard listener:', error.message));
 
 upstream.start().then(() => {
   httpServer.listen(cfg.listenPort, cfg.listenHost, () => {
@@ -385,6 +395,7 @@ async function shutdown() {
   await upstream.stop();
   httpServer.close();
   controlServer.close();
+  dashboardServer.close();
   process.exit(0);
 }
 process.on('SIGTERM', () => void shutdown());

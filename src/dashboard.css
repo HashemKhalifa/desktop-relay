@@ -21,6 +21,8 @@ body { margin: 0; padding: 24px; }
 .relay .brand { display: flex; align-items: center; gap: 12px; font-weight: 650; font-size: 16px; }
 .relay .brand-mark { color: var(--accent); font-size: 23px; line-height: 1; }
 .relay .pill { background: var(--accent-soft); color: #5140a4; border-radius: 999px; padding: 6px 12px; font-size: 12px; white-space: nowrap; }
+.relay .pill[data-state="connected"] { background: #dff2e7; color: #276346; }
+.relay .pill[data-state="offline"] { background: #fff0da; color: #8a5409; }
 .relay main { padding: 32px; }
 .relay .intro { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; margin-bottom: 28px; }
 .relay .eyebrow { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .13em; color: var(--muted); }

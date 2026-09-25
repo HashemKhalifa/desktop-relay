@@ -161,10 +161,15 @@ out, the public endpoint may be unavailable until it wakes and the user logs in.
 
 ### Local usage dashboard
 
-Run `bin/dc-relayctl dashboard` on the Mac to refresh and open a local HTML report.
+Run `bin/dc-relayctl dashboard` on the Mac to open the live local dashboard.
+The daemon serves it at `http://127.0.0.1:8789` (configurable with `dashboardPort`).
+It authenticates with a separate local key and polls every ten seconds for usage
+and daemon status. It starts with the daemon after login. The CLI opens it with
+a temporary URL fragment that the page exchanges for an HttpOnly cookie and removes
+from the address bar. The key stays in `~/.config/desktop-relay/dashboard.key`.
 It shows authenticated MCP request counts, tool calls, and health checks for today,
-this month, the last 14 days, and the last 12 months. Run the command again to
-refresh; `--no-open` only writes the report to
+this month, the last 14 days, and the last 12 months. `--no-open` exports a standalone
+snapshot to
 `~/.config/desktop-relay/dashboard.html`.
 
 The report is generated from the metadata-only audit file and its previous rotated
@@ -177,7 +182,35 @@ The overview includes a 14-day activity chart and daily/monthly ledgers. To chan
 the palette, spacing, or typography, edit `src/dashboard.css`; the `:root` variables
 define the colors. Styles are scoped under `.relay` and embedded in the generated
 HTML, so the report remains a single file with no build step or external assets.
-It is a snapshot: rerun the command for current counts.
+The exported file is a snapshot; the live page updates automatically. Result bytes
+are measured JSON traffic, including retained-result page reads, not model tokens.
+
+### Large tool results and context
+
+Plain-text results above 16 KiB return a short preview and a result ID. Use
+`read_relay_result` with that ID, `contentIndex` (default 0), and `offset` (default 0)
+to retrieve up to 12 KiB of exact UTF-8 text per page. Follow `nextOffset` until null,
+then increment `contentIndex` to read any remaining text blocks. This reads the
+original stored output; it never reruns the command.
+
+Results are scoped to the original principal and source-tool grant, including
+across new MCP sessions. They expire after one hour, may be evicted earlier under
+memory pressure, and disappear on daemon restart. The cache is 64 MiB total with
+a 32 MiB per-principal limit. Revocation clears that principal's retained results.
+An unavailable result does not establish that the original command failed.
+
+Small results, media, structured/schema-bound results, annotated text, widget-origin
+calls, and results larger than the per-principal cache limit preserve their native
+responses. These exceptions can still be large. Audit events record byte counts
+and whether a result was offloaded, without recording its contents.
+
+After updating, refresh Desktop Relay's tool definitions in ChatGPT so it discovers
+`read_relay_result`. This reduces large responses added to future turns; it does not
+shrink existing chat history or change ChatGPT's conversation limits.
+
+Run `node scripts/verify-context.ts https://dc.khalifah.uk` to check exact output
+recovery, principal isolation, revocation, and one-time command execution against
+the public endpoint. Use your own hostname on another installation.
 
 Lifecycle:
 

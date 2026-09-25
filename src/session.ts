@@ -13,6 +13,7 @@ import {
 import { credentialValid, type Credential, type Principal, type Store } from './creds.ts';
 import { grantedToolNames } from './policy.ts';
 import { describeTool } from './tool-descriptions.ts';
+import { readResultTool, resultBytes, type ResultStore } from './results.ts';
 import type { Upstream } from './upstream.ts';
 
 export interface Session {
@@ -33,6 +34,7 @@ export interface SessionCtx {
   version: string;
   rpcDeadlineMs: number;
   maxSessions: number;
+  results: ResultStore;
   audit: (event: string, fields: Record<string, unknown>) => void;
 }
 
@@ -88,7 +90,7 @@ export function createSession(ctx: SessionCtx, principal: Principal, credential:
   );
 
   server.setRequestHandler(ListToolsRequestSchema, () => ({
-    tools: ctx.upstream.toolInventory().filter((t) => session.grants.has(t.name)).map(describeTool),
+    tools: [...ctx.upstream.toolInventory().filter((t) => session.grants.has(t.name)).map(describeTool), ...(session.grants.size ? [readResultTool] : [])],
   }));
 
   server.setRequestHandler(ListResourcesRequestSchema, async (req, extra) => {
@@ -114,6 +116,11 @@ export function createSession(ctx: SessionCtx, principal: Principal, credential:
     if (session.generation !== ctx.upstream.generation || !credentialValid(ctx.storeRef.current, session.credentialId)) {
       closeSession(ctx, session);
       throw new McpError(ErrorCode.InvalidRequest, 'session invalid; re-initialize');
+    }
+    if (name === readResultTool.name) {
+      const result = ctx.results.read(session.principalId, session.grants, req.params.arguments ?? {});
+      ctx.audit('result.read', { principalId: session.principalId, ...resultBytes(result) });
+      return result;
     }
     if (!session.grants.has(name)) {
       ctx.audit('tool.denied', { principalId: session.principalId, credentialId: session.credentialId, sessionId: session.id, tool: name });
@@ -141,8 +148,16 @@ export function createSession(ctx: SessionCtx, principal: Principal, credential:
             },
       },
     );
-    ctx.audit('tool.result', { principalId: session.principalId, sessionId: session.id, tool: name, ms: Date.now() - started });
-    return result;
+    const output = req.params.arguments?.origin === 'ui' || ctx.upstream.toolInventory().find((t) => t.name === name)?.outputSchema
+      ? result : ctx.results.compact(session.principalId, name, result);
+    const originalSize = resultBytes(result);
+    ctx.audit('tool.result', {
+      principalId: session.principalId, sessionId: session.id, tool: name, ms: Date.now() - started,
+      ...(output === result ? originalSize : resultBytes(output)), originalBytes: originalSize.resultBytes,
+      argumentBytes: Buffer.byteLength(JSON.stringify(req.params.arguments ?? {})),
+      offloaded: output !== result, isError: result.isError === true,
+    });
+    return output;
   });
 
   session.transport = transport;
