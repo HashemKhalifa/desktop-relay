@@ -142,6 +142,11 @@ scripts/verify.sh https://dc.khalifah.uk
 is stopped, run `bin/dc-relayctl restart`; if the Mac is asleep, offline, or logged
 out, the public endpoint may be unavailable until it wakes and the user logs in.
 
+Idle MCP sessions expire after 15 minutes. At the 64-session limit, the relay can
+reclaim the oldest session idle for at least one minute; in-flight requests are
+preserved. A client whose session expires must initialize again. This cleanup does
+not restart Desktop Commander or rerun commands.
+
 ### Local usage dashboard
 
 Run `bin/dc-relayctl dashboard` on the Mac to open the live local dashboard.

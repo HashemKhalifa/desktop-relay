@@ -250,14 +250,28 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
         send(res, 404);
         return;
       }
-      await sess.transport.handleRequest(req, res, parsed);
+      sess.activeRequests++;
+      sess.lastActivity = Date.now();
+      try {
+        await sess.transport.handleRequest(req, res, parsed);
+      } finally {
+        sess.activeRequests--;
+        sess.lastActivity = Date.now();
+      }
       return;
     }
 
     if (!findInitialize(parsed)) { send(res, 400); return; }
     const sess = createSession(ctx, principal, credential);
     if (sess === null) { send(res, 503); return; }
-    await sess.transport.handleRequest(req, res, parsed);
+    sess.activeRequests++;
+    sess.lastActivity = Date.now();
+    try {
+      await sess.transport.handleRequest(req, res, parsed);
+    } finally {
+      sess.activeRequests--;
+      sess.lastActivity = Date.now();
+    }
   } finally {
     activePosts--;
   }
@@ -358,11 +372,11 @@ upstream.onstatechange = (state, generation) => {
   }
 };
 
-// Expiry enforcement on live sessions: sweep every 15s, close sessions whose
-// credential has passed expiresAt.
+// Reclaim abandoned sessions without interrupting in-flight requests.
 setInterval(() => {
   for (const sess of [...sessions.values()]) {
-    if (!creds.credentialValid(storeRef.current, sess.credentialId)) closeSession(ctx, sess);
+    if (!creds.credentialValid(storeRef.current, sess.credentialId)
+      || (sess.activeRequests === 0 && Date.now() - sess.lastActivity > 15 * 60_000)) closeSession(ctx, sess);
   }
 }, 15_000).unref();
 

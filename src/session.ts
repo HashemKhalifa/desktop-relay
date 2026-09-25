@@ -24,6 +24,8 @@ export interface Session {
   credentialId: string;
   generation: number;
   createdAt: number;
+  lastActivity: number;
+  activeRequests: number;
   grants: Set<string>;
 }
 
@@ -57,7 +59,15 @@ function grantedResourceUris(ctx: SessionCtx, grants: Set<string>): Set<string> 
 // progress route correctly by construction — the SDK aborts this handler's signal
 // and surfaces upstream progress only to this session's transport.
 export function createSession(ctx: SessionCtx, principal: Principal, credential: Credential): Session | null {
-  if (ctx.upstream.state !== 'running' || ctx.sessions.size >= ctx.maxSessions) return null;
+  if (ctx.upstream.state !== 'running') return null;
+  if (ctx.sessions.size >= ctx.maxSessions) {
+    const idle = [...ctx.sessions.values()]
+      .filter((s) => s.activeRequests === 0 && Date.now() - s.lastActivity >= 60_000)
+      .sort((a, b) => a.lastActivity - b.lastActivity)[0];
+    if (!idle) return null;
+    ctx.audit('session.evict', { sessionId: idle.id, reason: 'capacity' });
+    closeSession(ctx, idle);
+  }
 
   const session: Session = {
     id: undefined,
@@ -67,6 +77,8 @@ export function createSession(ctx: SessionCtx, principal: Principal, credential:
     credentialId: credential.id,
     generation: ctx.upstream.generation,
     createdAt: Date.now(),
+    lastActivity: Date.now(),
+    activeRequests: 0,
     grants: grantedToolNames(principal, ctx.upstream.toolInventory().map((t) => t.name)),
   };
 
