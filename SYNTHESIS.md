@@ -82,3 +82,70 @@ listed alternative for the ChatGPT-only path.
 Doc-level only at this stage (design package). `scripts/spike.ts` is the first
 implementation step and resolves the load-bearing SDK transport assumption before any
 real file is written.
+
+---
+
+# Revision 2 — protocol ownership (Codex review 2)
+
+The synthesized bridge (raw JSON-RPC forwarding + id namespacing between per-request
+transports and one upstream connection) was overturned by a second Codex review before
+implementation landed. This record preserves why.
+
+## The overturned assumption
+
+Revision 1 treated the daemon as a transport-level multiplexer: rewrite client request
+ids into one upstream id space, restore on the way out. Two reviews and the SDK source
+now establish that does not work for N clients sharing one child:
+
+- `initialize` is per-connection state: clientInfo, protocolVersion, capabilities.
+  Desktop Commander stores one process-wide `currentClient` (observed live in the
+  spike's `get_config` output). Forwarding multiple clients' init into one upstream
+  connection gives them one shared — and last-writer-wins — protocol identity.
+- Cancellation refers to `params.requestId`; progress refers to `progressToken`. Both
+  need per-session ownership, which flat id rewriting cannot express (duplicate
+  progress tokens across sessions would cross-deliver; a cancel from client B could
+  hit client A's call).
+- The SDK already owns this boundary: a `Server` instance per downstream session
+  handles init/cancel/progress per connection; the relay's single `Client` owns the
+  upstream side. Adopting protocol ownership deletes the custom bridging code rather
+  than patching it.
+
+## Adopted shape
+
+    authenticated listener → session router → SDK Server per session →
+    policy-checked handlers → one SDK Client → one DC child
+
+Session records are real protocol state (capabilities, credential binding, generation)
+— not fake terminal persistence. Child replacement invalidates old-generation
+sessions; in-flight calls become outcome-unknown, never replayed. Dispatch guarantee
+reworded to "at most one upstream dispatch per admitted request."
+
+## Additional corrections folded in (Codex review 2)
+
+- HTTP semantics: invalid Origin → 403; oversize → 413; rate-limited → 429; upstream
+  down → 503; 404 only for auth/unknown path. Node `requestTimeout` is an upload
+  deadline, not a response deadline; SDK RPC default is 60s — set deliberately to
+  15min configurable. SSE heartbeats via transport `keepAliveMs`, no byte injection.
+- Data model: Principal / Credential / Session as separate records; rotation = new
+  credential + expiry on old (enforced on live streams, rechecked before dispatch);
+  revoke = disable principal, close sessions, never mint replacement.
+- Control channel: daemon is sole writer of principals.json via unix socket with
+  acknowledged ops; file replacement alone does not prove live enforcement.
+- Audit: metadata-only default — no arg previews ("redact then truncate" is not a
+  complete rule for unknown secrets).
+- Tool names: real DC inventory (`start_process`, `read_process_output`,
+  `start_search`…) validated against pinned `tools/list`; `get_recent_tool_calls`
+  gated behind `allowSharedHistory` (it leaks cross-client args/outputs).
+- Watchdog: local check 60s, ngrok public probe 15min (60s public = 43.2k req/mo >
+  20k free quota); `StartInterval` not unconditional `KeepAlive`; classified failure
+  responses, no restart loops on quota.
+- Trust statement corrected: host mode = trusted clients of one operator, not
+  isolation. `PermitListen` (OpenSSH 7.8+) for `-R`; `PermitOpen` is not a fallback.
+  OAuth connector flows acknowledged as a deployment choice, not a constraint.
+
+## Acceptance contract
+
+Rewritten around the central requirement — two clients, one child (A starts a
+process, B reads its output, same child PID/generation) — plus cancellation
+ownership, revocation-closes-streams, crash-after-dispatch no-replay, and the
+HTTP/credential cases. Full contract in `ACCEPTANCE.md`.

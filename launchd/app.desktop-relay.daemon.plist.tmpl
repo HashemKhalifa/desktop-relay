@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>app.desktop-relay.daemon</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>@NODE@</string>
+    <string>@REPO@/src/daemon.ts</string>
+  </array>
+  <key>WorkingDirectory</key><string>@REPO@</string>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>5</integer>
+  <key>StandardOutPath</key><string>@LOGDIR@/daemon.log</string>
+  <key>StandardErrorPath</key><string>@LOGDIR@/daemon.err.log</string>
+  <key>EnvironmentVariables</key>
+  <dict><key>DESKTOP_RELAY_CONFIG</key><string>@CONFIG@</string></dict>
+</dict>
+</plist>

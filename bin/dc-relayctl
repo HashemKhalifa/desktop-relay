@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# desktop-relay control CLI. Mutations go through the daemon's unix socket —
+# this script never writes principals.json itself.
+set -euo pipefail
+
+LABEL="app.desktop-relay.daemon"
+CONFIG_DIR="${HOME}/.config/desktop-relay"
+CONFIG="${DESKTOP_RELAY_CONFIG:-${CONFIG_DIR}/config.json}"
+SOCK="${DESKTOP_RELAY_CONTROL:-$(node -e "try{console.log(JSON.parse(require('fs').readFileSync('$CONFIG','utf8')).controlSockPath??'')}catch{console.log('')}" 2>/dev/null)}"
+SOCK="${SOCK:-${CONFIG_DIR}/control.sock}"
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
+CTL=(node "${REPO}/src/ctl.ts")
+
+die() { echo "dc-relayctl: $*" >&2; exit 1; }
+
+public_base() {
+  node -e "console.log(JSON.parse(require('fs').readFileSync('$CONFIG','utf8')).publicBaseUrl ?? '')" 2>/dev/null || true
+}
+
+cmd="${1:-}"; shift || true
+
+case "$cmd" in
+  status)
+    DESKTOP_RELAY_CONTROL="$SOCK" "${CTL[@]}" status 2>/dev/null || { echo "daemon: not reachable"; exit 1; }
+    launchctl print "gui/$(id -u)/${LABEL}" 2>/dev/null | sed -n '1,8p' || true
+    ;;
+  mint|rotate|revoke|list)
+    DESKTOP_RELAY_CONTROL="$SOCK" "${CTL[@]}" "$cmd" "$@"
+    ;;
+  url)
+    base="$(public_base)"; [ -n "$base" ] || die "publicBaseUrl not set in $CONFIG"
+    echo "bearer clients:     ${base}/mcp"
+    echo "path-only clients:  ${base}/<pathToken>/mcp"
+    echo "(secrets shown by mint/rotate at creation only)"
+    ;;
+  logs)
+    tail -f "${HOME}/Library/Logs/desktop-relay/"*.log
+    ;;
+  audit)
+    [ -f "${CONFIG_DIR}/audit.jsonl" ] && tail -f "${CONFIG_DIR}/audit.jsonl" || die "no audit log yet"
+    ;;
+  restart)
+    launchctl kickstart -k "gui/$(id -u)/${LABEL}" && echo "restarted ${LABEL}"
+    ;;
+  doctor)
+    echo "-- sockets owned by us:"
+    lsof -nP -iTCP:8788 -sTCP:LISTEN 2>/dev/null || echo "  8788: nothing listening"
+    echo "-- LAN exposure check:"
+    for ip in $(ifconfig | awk '/inet /{print $2}' | grep -v '^127\.'); do
+      code=$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 1 "http://${ip}:8788/mcp" 2>/dev/null || echo 000)
+      echo "  ${ip}:8788 -> ${code}"
+    done
+    echo "-- local health (needs a credential):"
+    curl -s -o /dev/null -w '  unauthenticated -> %{http_code}\n' "http://127.0.0.1:8788/mcp" -X POST -d '{}' || true
+    echo ""
+    ;;
+  *)
+    cat <<EOF
+usage: dc-relayctl <command>
+  status                              daemon + launchd state
+  mint --name N --kind bearer|path-only --tools all|a,b,c [--rate N] [--allow-shared-history]
+  rotate --principal-id P [--grace-hours N]
+  revoke --principal-id P
+  list                                principals + credential metadata
+  url                                 endpoint shapes for clients
+  logs | audit                        tail daemon logs / audit trail
+  restart                             kickstart the daemon
+  doctor                              listener ownership + LAN exposure check
+EOF
+    ;;
+esac

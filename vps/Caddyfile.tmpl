@@ -1,0 +1,7 @@
+# Rendered by scripts/vps-bootstrap.sh — @DOMAIN@ → public hostname, @PORT@ →
+# the loopback port ssh -R forwards to (default 2222).
+@DOMAIN@ {
+    reverse_proxy 127.0.0.1:@PORT@
+    # No auth here: all credential enforcement is in the Mac daemon.
+    # The VPS only sees TLS-terminated bytes to an already-auth'd service.
+}
