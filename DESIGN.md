@@ -71,6 +71,15 @@ tokenPath, publicBaseUrl }`), one token file at `~/.config/desktop-relay/token`
 (mode 0600). The edge choice is a single enum consumed by `install.sh` and the plist
 templates, so switching edge later is a config edit plus reinstall, not a code change.
 
+Stack: plain TypeScript on Node >= 24, run via native type stripping
+(`node src/auth-proxy.ts`, no transpiler, zero runtime dependencies). Node is a
+mandatory runtime on the box anyway since `desktop-commander` and `supergateway`
+are Node; adding Python buys nothing and adds a second runtime. Effect TS rejected
+for escape-hatch scope: framework weight under ~150 lines of glue, and its retry
+machinery is the wrong instinct here since `tools/call` is not idempotent. If the
+repo ever grows toward the vendor's full feature set (multi-device registry, OAuth
+pairing, dashboard), revisit Effect as the base.
+
 Repository layout:
 
 ```
@@ -78,7 +87,7 @@ README.md
 DESIGN.md                 this file
 config.example.json
 install.sh                generates token, renders plists, loads launchd agents
-src/auth-proxy.mjs        zero-dependency node:http proxy, token gate -> supergateway
+src/auth-proxy.ts         zero-dependency node:http proxy, token gate -> supergateway
 bin/dc-relayctl           status / logs / rotate
 launchd/                  plist templates for gateway and tunnel agents
 scripts/verify.sh         end-to-end check: initialize -> tools/list -> tools/call -> 404
@@ -121,6 +130,9 @@ the Mac-side stack is identical, only the tunnel agent and edge host differ.
   for free stable TLS; the ssh -R edge variant removes that.
 - We accept secret-path URLs being logged in client dashboards in exchange for
   header-less client compatibility.
+- We accept plain TypeScript without a framework in exchange for zero dependencies;
+  the proxy forwards each request exactly once and never retries, because
+  `tools/call` is not idempotent.
 
 ## Alternatives considered
 
