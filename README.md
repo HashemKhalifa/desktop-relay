@@ -132,8 +132,10 @@ path-only credential is required for this setup. Never paste the token into a ch
 issue, log, or repository file.
 
 The relay exposes Desktop Commander's structured tool arguments directly; a device
-ID is unnecessary because this endpoint targets one Mac. The `start_process`
-description is concise and specific to this deployment. ChatGPT still controls
+ID is unnecessary because this endpoint targets one Mac. Compact descriptions in
+`src/tool-descriptions.ts` cover the pinned upstream tools; their argument schemas,
+risk annotations, and UI metadata remain intact. Unrecognized tools retain their
+upstream description. ChatGPT still controls
 action approvals, and its saved tool definitions may need refreshing after an update.
 
 ### After a Mac or daemon restart
@@ -170,6 +172,12 @@ file. Tool-call history already in the audit is included; request counts begin w
 the request-audit event added alongside this dashboard. Older HTTP requests cannot
 be backfilled, and the relay cannot count ChatGPT tokens or model costs. The report
 stays on the Mac and is not served by the public tunnel.
+
+The overview includes a 14-day activity chart and daily/monthly ledgers. To change
+the palette, spacing, or typography, edit `src/dashboard.css`; the `:root` variables
+define the colors. Styles are scoped under `.relay` and embedded in the generated
+HTML, so the report remains a single file with no build step or external assets.
+It is a snapshot: rerun the command for current counts.
 
 Lifecycle:
 

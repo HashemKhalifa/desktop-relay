@@ -1,0 +1,32 @@
+import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+
+const descriptions: Record<string, string> = {
+  get_config: 'Read Desktop Commander configuration, including allowed directories, blocked commands, shell, file limits, telemetry, client history, version, and system information.',
+  read_file: 'Read an absolute file path within allowed directories, or a URL with isUrl=true. Text uses zero-based offset and length; negative offset reads the last N lines and ignores length. URLs return full content. Excel returns a JSON 2D array: sheet is a name or zero-based index string, range uses A1:D10 syntax; offset/length paginate rows. Images return viewable content. PDF returns markdown and images; offset/length paginate pages. DOCX with offset=0 returns a body outline; nonzero offset returns XML lines for edit_block.',
+  read_multiple_files: 'Read multiple absolute file paths within allowed directories. Returns text or viewable PNG/JPEG/GIF/WebP content with each path. A failed file does not stop other reads.',
+  write_file: 'Write an absolute file path within allowed directories. mode=rewrite replaces content; append adds content. Text is a string. Excel accepts a JSON 2D array or a JSON object mapping sheet names to arrays. Creating a .docx converts text and markdown headings to paragraphs; edit existing DOCX with edit_block and create PDFs with write_pdf. Long writes may produce a line-limit warning; they are still written. After an interrupted write, inspect the file before continuing to avoid duplicate content.',
+  write_pdf: 'Create a PDF from markdown, HTML/CSS, and inline SVG, or modify a PDF using insert/delete operations. Supply a new outputPath to preserve the original. Page indexes are zero-based. insert accepts markdown or sourcePdfPath; delete accepts pageIndexes. An HTML div with style="page-break-before: always" inserts a page break. Use absolute paths within allowed directories.',
+  create_directory: 'Create an absolute directory path within allowed directories, including missing parents. Existing directories are accepted.',
+  list_directory: 'List an absolute directory path within allowed directories. depth=1 lists direct children; default 2 includes one subdirectory level. Results mark files, directories, denied paths, and missing paths. Top-level items are complete; nested directories show at most 100 items with a warning for hidden results.',
+  move_file: 'Move or rename a file or directory. source and destination must be absolute paths within allowed directories.',
+  start_search: 'Start a background search under an absolute path; returns a session ID. searchType=files matches filenames; content searches file contents. Patterns use regex by default; literalSearch=true matches exact text. filePattern limits file types; ignoreCase defaults true. includeHidden, contextLines, maxResults, and timeout_ms bound the search. earlyTermination defaults true for filenames and false for content. Read results with get_more_search_results; cancel with stop_search.',
+  get_more_search_results: 'Read paginated results and status from a search session. offset is zero-based and length defaults to 100. Negative offset returns the last N results and ignores length. Call again to read results as a background search progresses.',
+  stop_search: 'Stop a background search by sessionId. Final results remain readable until cleanup after five minutes.',
+  list_searches: 'List active search sessions with IDs, type, pattern, status, and runtime.',
+  get_file_info: 'Read metadata for an absolute file or directory path within allowed directories: size, timestamps, permissions, and type. Text adds lineCount, zero-based lastLine, and appendPosition. Excel adds sheet names and row/column counts.',
+  edit_block: 'Edit an absolute file_path within allowed directories. Text replaces old_string with new_string; expected_replacements defaults to 1 and must match the intended occurrence count. Include enough exact whitespace and context to identify the match. DOCX edits XML fragments from read_file with nonzero offset, including headers/footers. Excel uses range="SheetName!A1:C10" and content as a 2D array. Near matches return a diff for correction.',
+  start_process: 'Run a shell command or start an interactive process on the connected Mac with the server user’s permissions. Commands can modify files, access the network, and launch programs. Use absolute paths and change directory within command when needed. timeout_ms bounds the wait for initial output; the process may continue afterward. Read further output with read_process_output; send input with interact_with_process. shell selects the shell; verbose_timing adds diagnostics. node:local uses ES imports and code in one call.',
+  read_process_output: 'Read output and state of a process by PID. offset=0 returns new output since the last read and waits up to timeout_ms; positive offsets are absolute line positions; negative offsets count from the end. length limits returned lines, subject to the configured fileReadLineLimit. A timeout may leave the process running. verbose_timing adds diagnostics.',
+  interact_with_process: 'Send input to an existing process by PID and receive output. Input can execute code or shell commands with the process permissions. Supports interactive shells and language/database REPLs. timeout_ms defaults to 8000; wait_for_prompt defaults true; verbose_timing adds diagnostics. A timeout does not establish that execution stopped or failed.',
+  force_terminate: 'Forcefully terminate a Desktop Commander terminal session by PID.',
+  list_sessions: 'List active Desktop Commander terminal sessions with PID, runtime, and input-waiting status. A blocked session may simply be waiting for REPL input.',
+  list_processes: 'List running processes on the Mac, including PID, command name, CPU usage, and memory usage.',
+  kill_process: 'Forcefully terminate a running process on the Mac by PID.',
+  get_usage_stats: 'Read Desktop Commander tool usage totals, success/failure rates, and performance statistics.',
+  get_prompts: 'Retrieve an onboarding prompt with action=get_prompt. IDs: onb2_01 organizes Downloads; onb2_02 explains a codebase; onb2_03 creates a knowledge base; onb2_04 analyzes a data file; onb2_05 checks system health. Returns prompt content describing the workflow.',
+};
+
+export function describeTool(tool: Tool): Tool {
+  const description = Object.hasOwn(descriptions, tool.name) ? descriptions[tool.name] : tool.description;
+  return { ...tool, description };
+}

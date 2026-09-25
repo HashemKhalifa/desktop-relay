@@ -1,0 +1,89 @@
+:root {
+  color-scheme: light;
+  --page: #efede8;
+  --surface: #ffffff;
+  --subtle: #f7f6f3;
+  --line: #e8e5df;
+  --ink: #1b1b19;
+  --muted: #74716a;
+  --accent: #6652c7;
+  --accent-soft: #ece8fc;
+  --secondary: #b2aaa0;
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--page);
+  color: var(--ink);
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 24px; }
+.relay { max-width: 1320px; margin: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 28px; overflow: hidden; }
+.relay a { color: inherit; }
+.relay .masthead { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 23px 32px; border-bottom: 1px solid var(--line); }
+.relay .brand { display: flex; align-items: center; gap: 12px; font-weight: 650; font-size: 16px; }
+.relay .brand-mark { color: var(--accent); font-size: 23px; line-height: 1; }
+.relay .pill { background: var(--accent-soft); color: #5140a4; border-radius: 999px; padding: 6px 12px; font-size: 12px; white-space: nowrap; }
+.relay main { padding: 32px; }
+.relay .intro { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; margin-bottom: 28px; }
+.relay .eyebrow { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .13em; color: var(--muted); }
+.relay h1 { font-size: clamp(27px, 4vw, 36px); letter-spacing: -.045em; line-height: 1.2; font-weight: 600; margin: 8px 0; }
+.relay p { margin: 0; color: var(--muted); }
+.relay .timestamp { text-align: right; font-size: 12px; color: var(--muted); }
+.relay .timestamp time { display: block; color: var(--ink); font-variant-numeric: tabular-nums; margin-top: 4px; }
+.relay .metrics { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; }
+.relay .metric { padding: 24px; min-width: 0; }
+.relay .metric + .metric { border-left: 1px solid var(--line); }
+.relay .metric:first-child { background: var(--subtle); }
+.relay .metric-label { color: var(--muted); font-size: 12px; }
+.relay .metric strong { display: block; font-size: clamp(32px, 5vw, 48px); line-height: 1.2; letter-spacing: -.055em; font-weight: 550; margin: 10px 0; font-variant-numeric: tabular-nums; }
+.relay .metric-note { font-size: 12px; color: var(--muted); }
+.relay .panel { margin-top: 24px; border: 1px solid var(--line); border-radius: 18px; overflow: hidden; }
+.relay .panel-header { padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.relay h2 { font-size: 15px; font-weight: 600; letter-spacing: -.02em; margin: 0; }
+.relay .panel-header p { font-size: 12px; margin-top: 3px; }
+.relay .legend { display: flex; gap: 16px; font-size: 11px; color: var(--muted); }
+.relay .legend span { white-space: nowrap; }
+.relay .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-right: 6px; }
+.relay .dot.tools { background: var(--secondary); }
+.relay .chart { padding: 0 24px 20px; }
+.relay .chart-grid { display: flex; gap: 10px; background: repeating-linear-gradient(to top, transparent 0, transparent 49px, var(--line) 49px, var(--line) 50px); }
+.relay .chart-day { flex: 1; min-width: 0; }
+.relay .bars { height: 170px; display: flex; align-items: flex-end; justify-content: center; gap: 3px; padding-top: 16px; }
+.relay .column { width: 15px; max-width: 40%; border-radius: 4px 4px 0 0; background: var(--accent); }
+.relay .column.tools { background: var(--secondary); }
+.relay .chart-labels { display: flex; gap: 10px; margin-top: 10px; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.relay .chart-labels span { flex: 1; text-align: center; min-width: 0; }
+.relay .ledgers { display: grid; grid-template-columns: 1.15fr 1fr; gap: 24px; align-items: start; }
+.relay .table-wrap { overflow-x: auto; }
+.relay table { border-collapse: collapse; width: 100%; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.relay th, .relay td { padding: 12px 18px; text-align: right; border-top: 1px solid var(--line); }
+.relay th:first-child, .relay td:first-child { text-align: left; padding-left: 24px; }
+.relay th:last-child, .relay td:last-child { padding-right: 24px; }
+.relay thead { color: var(--muted); background: var(--subtle); font-size: 10px; }
+.relay thead th { font-weight: 500; }
+.relay tbody th { font-weight: 450; color: var(--muted); }
+.relay tbody tr:first-child { background: #fbfaf8; }
+.relay .retained { display: flex; flex-wrap: wrap; gap: 12px 28px; padding: 18px 24px; border-top: 1px solid var(--line); background: var(--subtle); color: var(--muted); font-size: 12px; }
+.relay .retained strong { color: var(--ink); font-weight: 600; margin-left: 5px; }
+.relay .notes { padding: 22px 24px; font-size: 12px; }
+.relay summary { cursor: pointer; font-weight: 550; }
+.relay details p { margin-top: 12px; max-width: 85ch; }
+.relay .refresh { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; color: var(--muted); }
+.relay code { font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--subtle); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; overflow-wrap: anywhere; }
+.relay footer { padding: 18px 32px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; display: flex; justify-content: space-between; gap: 16px; }
+@media (max-width: 760px) {
+  body { padding: 10px; }
+  .relay { border-radius: 20px; }
+  .relay main { padding: 20px 16px; }
+  .relay .masthead, .relay footer { padding: 18px; }
+  .relay .intro { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .relay .timestamp { text-align: left; }
+  .relay .metrics { grid-template-columns: 1fr; }
+  .relay .metric { padding: 18px 22px; }
+  .relay .metric + .metric { border-left: 0; border-top: 1px solid var(--line); }
+  .relay .metric strong { font-size: 36px; }
+  .relay .ledgers { grid-template-columns: 1fr; gap: 0; }
+  .relay .panel-header { align-items: flex-start; flex-direction: column; }
+  .relay .chart { padding-inline: 14px; }
+  .relay .chart-grid, .relay .chart-labels { gap: 4px; }
+  .relay .chart-labels span:nth-child(even) { visibility: hidden; }
+  .relay .bars { gap: 2px; }
+}

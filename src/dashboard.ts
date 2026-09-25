@@ -56,51 +56,54 @@ function periodKeys(now: Date, count: number, unit: 'day' | 'month'): string[] {
 }
 
 function rows(keys: string[], data: Map<string, Counts>): string {
-  const peak = Math.max(1, ...keys.map((key) => data.get(key)?.mcp ?? 0));
   return keys.map((key) => {
     const count = data.get(key) ?? empty();
-    const width = Math.round(count.mcp / peak * 100);
-    return `<tr><th scope="row">${key}</th><td><div class="bar" style="width:${width}%"></div><span>${count.mcp}</span></td><td>${count.tools}</td><td>${count.health}</td></tr>`;
+    return `<tr><th scope="row">${key}</th><td>${count.mcp}</td><td>${count.tools}</td><td>${count.health}</td></tr>`;
   }).join('\n');
 }
 
-function card(label: string, name: string, value: number): string {
-  return `<div class="card"><span>${label}</span><strong data-metric="${name}">${value}</strong></div>`;
+function activityChart(keys: string[], data: Map<string, Counts>): string {
+  const peak = Math.max(1, ...keys.flatMap((key) => {
+    const count = data.get(key) ?? empty();
+    return [count.mcp, count.tools];
+  }));
+  const bars = keys.map((key) => {
+    const count = data.get(key) ?? empty();
+    const label = `${key}: ${count.mcp} MCP requests, ${count.tools} tool calls`;
+    return `<div class="chart-day" role="img" aria-label="${label}" title="${label}"><div class="bars"><div class="column" style="height:${count.mcp / peak * 100}%"></div><div class="column tools" style="height:${count.tools / peak * 100}%"></div></div></div>`;
+  }).join('');
+  return `<div class="chart"><div class="chart-grid">${bars}</div><div class="chart-labels" aria-hidden="true">${keys.map((key) => `<span>${key.slice(5).replace('-', '/')}</span>`).join('')}</div></div>`;
 }
 
 function render(data: Awaited<ReturnType<typeof collect>>, now: Date): string {
   const today = data.days.get(dayKey(now)) ?? empty();
   const month = data.months.get(monthKey(now)) ?? empty();
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const styles = fs.readFileSync(new URL('./dashboard.css', import.meta.url), 'utf8');
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
-<title>Desktop Relay usage</title>
-<style>
-  :root{font:16px system-ui,sans-serif;color-scheme:light dark}body{max-width:1050px;margin:0 auto;padding:32px 20px;line-height:1.4}
-  h1{margin-bottom:0}p{color:GrayText}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px;margin:28px 0}
-  .card{border:1px solid GrayText;border-radius:12px;padding:16px}.card span{display:block;font-size:.82rem;color:GrayText}.card strong{font-size:2rem}
-  .tables{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px}table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
-  th,td{text-align:right;padding:7px 5px;border-bottom:1px solid GrayText}th:first-child{text-align:left}td:nth-child(2){min-width:85px}
-  .bar{height:6px;background:#3b82f6;border-radius:4px;float:left;margin-top:8px;margin-right:6px}small{color:GrayText}
-</style></head><body>
-<h1>Desktop Relay usage</h1><p>Generated ${now.toLocaleString()} (${zone}) from the local audit log.</p>
-<div class="cards">
-${card('MCP requests today', 'today-mcp', today.mcp)}
-${card('Tool calls today', 'today-tools', today.tools)}
-${card('Health checks today', 'today-health', today.health)}
-${card('MCP requests this month', 'month-mcp', month.mcp)}
-${card('Tool calls this month', 'month-tools', month.tools)}
-${card('MCP requests retained', 'all-mcp', data.total.mcp)}
-${card('Tool calls retained', 'all-tools', data.total.tools)}
-</div>
-<div class="tables"><section><h2>Last 14 days</h2><table><thead><tr><th>Day</th><th>MCP requests</th><th>Tool calls</th><th>Health</th></tr></thead><tbody>
+<title>Desktop Relay · Usage</title><style>${styles}</style></head>
+<body><div class="relay">
+<header class="masthead"><div class="brand"><span class="brand-mark" aria-hidden="true">Ⅱ</span> Desktop Relay</div><span class="pill">Usage snapshot</span></header>
+<main>
+<div class="intro"><div><div class="eyebrow">Your Mac · Your infrastructure</div><h1>Usage overview</h1><p>Daily and monthly activity on your Mac.</p></div><div class="timestamp">Generated · ${zone}<time datetime="${now.toISOString()}">${now.toLocaleString()}</time></div></div>
+<section class="metrics" aria-label="Usage totals">
+<div class="metric"><span class="metric-label">MCP requests today</span><strong data-metric="today-mcp">${today.mcp}</strong><span class="metric-note">Authenticated requests · ${dayKey(now)}</span></div>
+<div class="metric"><span class="metric-label">Tool calls today</span><strong data-metric="today-tools">${today.tools}</strong><span class="metric-note">Commands dispatched to Desktop Commander</span></div>
+<div class="metric"><span class="metric-label">MCP requests this month</span><strong data-metric="month-mcp">${month.mcp}</strong><span class="metric-note"><span data-metric="month-tools">${month.tools}</span> tool calls · ${monthKey(now)}</span></div>
+</section>
+<section class="panel" aria-labelledby="activity-title"><div class="panel-header"><div><h2 id="activity-title">Activity over time</h2><p>Last 14 days · counts from retained logs</p></div><div class="legend"><span><i class="dot"></i>MCP requests</span><span><i class="dot tools"></i>Tool calls</span></div></div>
+${activityChart(periodKeys(now, 14, 'day').reverse(), data.days)}
+</section>
+<div class="ledgers"><section class="panel" aria-labelledby="daily-title"><div class="panel-header"><div><h2 id="daily-title">Daily usage</h2><p>Requests, tool calls, and health checks</p></div><span class="eyebrow">14 days</span></div><div class="table-wrap"><table><thead><tr><th scope="col">DAY</th><th scope="col">REQUESTS</th><th scope="col">TOOLS</th><th scope="col">HEALTH</th></tr></thead><tbody>
 ${rows(periodKeys(now, 14, 'day'), data.days)}
-</tbody></table></section><section><h2>Last 12 months</h2><table><thead><tr><th>Month</th><th>MCP requests</th><th>Tool calls</th><th>Health</th></tr></thead><tbody>
+</tbody></table></div></section><section class="panel" aria-labelledby="monthly-title"><div class="panel-header"><div><h2 id="monthly-title">Monthly usage</h2><p>History available in the retained logs</p></div><span class="eyebrow">12 months</span></div><div class="table-wrap"><table><thead><tr><th scope="col">MONTH</th><th scope="col">REQUESTS</th><th scope="col">TOOLS</th><th scope="col">HEALTH</th></tr></thead><tbody>
 ${rows(periodKeys(now, 12, 'month'), data.months)}
-</tbody></table></section></div>
-<p><small>Requests are completed authenticated MCP HTTP requests. Health checks are separate. Tool calls count dispatches, including calls whose outcome may be unknown. Request counts begin when request auditing was added; earlier requests cannot be reconstructed. Totals cover only the current and previous retained audit files. This relay does not see ChatGPT tokens or model costs. Run <code>dc-relayctl dashboard</code> again to refresh.</small></p>
-</body></html>`;
+</tbody></table></div></section></div>
+<section class="panel"><div class="retained"><span>Retained requests <strong data-metric="all-mcp">${data.total.mcp}</strong></span><span>Retained tool calls <strong data-metric="all-tools">${data.total.tools}</strong></span><span>Health checks today <strong data-metric="today-health">${today.health}</strong></span></div><div class="notes"><details><summary>What these numbers include</summary><p>Requests are completed authenticated MCP HTTP requests, including failed responses. Health checks are separate. Tool calls count dispatches, including calls whose outcome may be unknown. Multiple protocol requests may support one tool call.</p><p>Counts cover the current and previous retained audit files. A zero means no recorded events in those files; it does not establish no activity before logging began or after older logs were removed. Earlier HTTP requests cannot be reconstructed. ChatGPT token usage and model costs are not available to this relay.</p></details><div class="refresh"><span>Refresh and reopen from the relay folder</span><code>bin/dc-relayctl dashboard</code></div></div></section>
+</main><footer><span>Private report · stored on this Mac</span><span>Snapshot, updated when you run the command</span></footer>
+</div></body></html>`;
 }
 
 async function main(): Promise<void> {
