@@ -5,24 +5,12 @@ relay. Run [Desktop Commander MCP](https://github.com/wonderwhy-er/desktopcomman
 on your own machine behind your own authenticated HTTPS endpoint, with no monthly
 tool-call quota.
 
-## Why this exists
-
-The [DesktopCommanderMCP](https://github.com/wonderwhy-er/desktopcommandermcp) server is
-open source and unlimited. The metered part is the hosted relay at
-`mcp.desktopcommander.app`, which brokers calls between web AI clients (ChatGPT, Claude,
-any remote MCP client) and your machine. Free tier: 10,000 tool calls/month, then
-$20/month Pro.
-
-The OSS repo already ships the device-side client (`src/remote-device/`,
-`desktop-commander remote`), but it only speaks to the vendor's relay. The relay itself
-is closed source. This repo rebuilds exactly that middle layer.
-
 ## Architecture
 
 ```
 remote MCP client
   -> https://<your-edge>/mcp               TLS at the edge
-  -> tunnel agent on your Mac              ngrok | cloudflared | ssh -R
+  -> tunnel agent on your Mac              Cloudflare named tunnel
   -> 127.0.0.1:8788  src/daemon.ts         auth + limits + audit
        |-- one SDK Server + transport per client session   (session.ts)
        |-- policy-checked tools and advertised UI resources (session.ts)
@@ -39,25 +27,16 @@ Node 24 runs the TypeScript directly (native type stripping). Runtime deps:
 `@modelcontextprotocol/sdk@1.30.0` + `@wonderwhy-er/desktop-commander@0.2.51`, both
 exact-pinned.
 
-## Install
+## Install with Cloudflare
+
+Requires macOS, Node 24, `cloudflared`, and a domain managed by Cloudflare.
+Use your own hostname in place of `dc.khalifah.uk` for another installation.
 
 ```bash
-git clone <this repo> && cd desktop-relay
+git clone git@github.com:HashemKhalifa/desktop-relay.git
+cd desktop-relay
 npm ci
-./install.sh --edge none                     # local only
-bin/dc-relayctl mint --name me --kind bearer --tools all
-scripts/verify.sh                            # acceptance: 17 checks
 ```
-
-Public edge (only after `verify.sh` passes):
-
-```bash
-./install.sh --edge ngrok --domain <you>.ngrok-free.app
-# or: --edge cloudflare --domain mcp.example.com   (needs a named tunnel)
-# or: --edge vps-ssh --vps shivo@dedicated --domain mcp.example.com
-```
-
-### Cloudflare named tunnel
 
 On the Mac, log in to Cloudflare and create the tunnel and DNS route once:
 
@@ -163,8 +142,9 @@ out, the public endpoint may be unavailable until it wakes and the user logs in.
 
 Run `bin/dc-relayctl dashboard` on the Mac to open the live local dashboard.
 The daemon serves it at `http://127.0.0.1:8789` (configurable with `dashboardPort`).
-It authenticates with a separate local key and polls every ten seconds for usage
-and daemon status. It starts with the daemon after login. The CLI opens it with
+It loads usage and daemon status immediately when opened or reloaded, refreshes
+when you return to the tab, and polls every ten seconds while visible. It starts
+with the daemon after login. The CLI opens it with
 a temporary URL fragment that the page exchanges for an HttpOnly cookie and removes
 from the address bar. The key stays in `~/.config/desktop-relay/dashboard.key`.
 It shows authenticated MCP request counts, tool calls, and health checks for today,
@@ -182,8 +162,8 @@ The overview includes a 14-day activity chart and daily/monthly ledgers. To chan
 the palette, spacing, or typography, edit `src/dashboard.css`; the `:root` variables
 define the colors. Styles are scoped under `.relay` and embedded in the generated
 HTML, so the report remains a single file with no build step or external assets.
-The exported file is a snapshot; the live page updates automatically. Result bytes
-are measured JSON traffic, including retained-result page reads, not model tokens.
+Result bytes measure JSON traffic, including retained-result page reads, not model
+tokens.
 
 ### Large tool results and context
 
@@ -212,19 +192,44 @@ Run `node scripts/verify-context.ts https://dc.khalifah.uk` to check exact outpu
 recovery, principal isolation, revocation, and one-time command execution against
 the public endpoint. Use your own hostname on another installation.
 
-Lifecycle:
+## Update an existing installation
+
+Wait for active tool calls and terminal jobs to finish before restarting. From the
+repository directory:
 
 ```bash
-bin/dc-relayctl list                          # principals + credential metadata
-bin/dc-relayctl rotate --principal-id prin_…  # 24h grace on the old credential
-bin/dc-relayctl revoke --principal-id prin_…  # kills credentials AND live sessions
-bin/dc-relayctl status | url | logs | audit | doctor
+git pull --ff-only
+npm ci
+bin/dc-relayctl restart
+bin/dc-relayctl doctor
 ```
+
+The restart loads the new daemon code and dashboard assets. It also clears MCP
+sessions, terminal output tracking, and retained results; save needed output first.
+Your credentials and Cloudflare setup persist. Refresh the app's tool definitions
+in ChatGPT after tool changes, then start a new chat with **Desktop Relay** selected.
+You do not need to run the installer again for a normal update.
+
+## Manage the relay
+
+| Command | Purpose |
+| --- | --- |
+| `bin/dc-relayctl status` | Show daemon and upstream state |
+| `bin/dc-relayctl doctor` | Check listener ownership and LAN exposure |
+| `bin/dc-relayctl dashboard` | Open the live local usage page |
+| `bin/dc-relayctl dashboard --no-open` | Export a static HTML report |
+| `bin/dc-relayctl logs` | Read service logs |
+| `bin/dc-relayctl audit` | Read metadata-only audit events |
+| `bin/dc-relayctl list` | List principals and credential metadata |
+| `bin/dc-relayctl rotate --principal-id prin_…` | Rotate with 24-hour grace |
+| `bin/dc-relayctl revoke --principal-id prin_…` | Revoke credentials and close sessions |
 
 ## Security model
 
-- Single authenticated listener on `127.0.0.1`; the tunnel forwards to it — auth is
-  never terminated by the edge. Failures: `404` (auth), `403` (Host/Origin),
+- The MCP listener binds to `127.0.0.1:8788`; the tunnel forwards to it and the
+  daemon authenticates requests. The separately authenticated dashboard listens
+  on `127.0.0.1:8789` and is not exposed by the tunnel. MCP failures: `404` (auth),
+  `403` (Host/Origin),
   `413`/`408` (body limits), `429` (rate), `503` (upstream down/overloaded).
 - Per-principal grants validated against the pinned binary's `tools/list`.
   `set_config_value` and `give_feedback_to_desktop_commander` are denied for everyone
@@ -237,25 +242,13 @@ bin/dc-relayctl status | url | logs | audit | doctor
   via the daemon's control socket (`~/.config/desktop-relay/control.sock`, mode 0600);
   revoking closes live sessions.
 
-## Provider honesty
-
-The relay itself is unmetered, but the edge isn't magic: ngrok free ≈ 20k HTTP req/mo +
-1GB (the watchdog probes publicly every 15 min to stay well inside it). A VPS you
-already own has no such quota. Keep the vendor connector installed until acceptance
-passes — this replaces it, nothing forces you to uninstall it.
-
 ## Docs
 
 - [DESIGN.md](DESIGN.md) — architecture, threat model, why protocol ownership
 - [SYNTHESIS.md](SYNTHESIS.md) — 4-candidate arena + both Codex reviews, pick/graft record
 - [ACCEPTANCE.md](ACCEPTANCE.md) — the full verification contract
+- [Context and dashboard design](docs/CONTEXT.md) — response limits, alternatives, and evidence
 - [vps/README.md](vps/README.md) — self-sovereign SSH edge
-
-## Links
-
-- Desktop Commander MCP: https://github.com/wonderwhy-er/desktopcommandermcp
-- Hosted relay this replaces: https://mcp.desktopcommander.app
-- MCP SDK: https://github.com/modelcontextprotocol/typescript-sdk
 
 ## License
 

@@ -31,4 +31,10 @@ async function refresh() {
 }
 
 void refresh();
-setInterval(refresh, 10000);
+function refreshVisible() {
+  if (!document.hidden) void refresh();
+}
+
+document.addEventListener('visibilitychange', refreshVisible);
+window.addEventListener('focus', refreshVisible);
+setInterval(refreshVisible, 10000);
