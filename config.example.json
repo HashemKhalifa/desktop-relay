@@ -1,8 +1,17 @@
 {
-  "edge": "ngrok",
-  "portProxy": 8788,
-  "portGateway": 8787,
-  "upstreamCmd": "npx -y @wonderwhy-er/desktop-commander@latest",
-  "tokenPath": "~/.config/desktop-relay/token",
-  "publicBaseUrl": "https://<your-static>.ngrok-free.app"
+  "edge": { "type": "ngrok", "domain": "<your-static>.ngrok-free.app" },
+  "port": 8788,
+  "upstreamCmd": "node node_modules/@wonderwhy-er/desktop-commander/dist/index.js",
+  "secretsPath": "~/.config/desktop-relay/principals.json",
+  "auditPath": "~/.config/desktop-relay/audit.jsonl",
+  "alertsPath": "~/.config/desktop-relay/alerts.jsonl",
+  "publicBaseUrl": "https://<your-static>.ngrok-free.app",
+  "maxBodyBytes": 16777216,
+  "maxConcurrent": 16,
+  "uploadDeadlineMs": 10000,
+  "rotateGraceSec": 86400,
+  "logDir": "~/Library/Logs/desktop-relay",
+  "logMaxBytes": 5000000,
+  "sandbox": "host",
+  "mounts": []
 }

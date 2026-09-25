@@ -21,25 +21,31 @@ is closed source. This repo rebuilds exactly that middle layer:
 AI client (ChatGPT / Claude / Codex / any MCP client)
   -> https://<your-edge>/mcp              TLS at the edge
   -> tunnel agent on your Mac             cloudflared | ngrok | ssh -R
-  -> 127.0.0.1:8788 auth proxy            token check (path or Bearer)
-  -> 127.0.0.1:8787 supergateway          stdio <-> Streamable HTTP
-  -> desktop-commander (stdio)            the OSS MCP server
+  -> 127.0.0.1:8788 src/daemon.ts         auth + limits + audit, one process
+       |-- per-client principals, Host/Origin checks, token bucket
+       |-- JSON-RPC bridge (id namespacing, at-most-once forwarding)
+       |-- one long-lived desktop-commander child via MCP stdio transport
+  -> desktop-commander (stdio child)      the OSS MCP server
 ```
 
-Everything above the edge runs on loopback. The only egress is the tunnel agent's
-outbound connection. No open ports, no firewall changes.
+One loopback listener, one tunnel, one desktop-commander child owned by the daemon.
+No unauthenticated HTTP hop anywhere: the only listener is the authenticated one.
+Node 24 runs the TypeScript directly; the single runtime dependency
+(`@modelcontextprotocol/sdk`) is exact-pinned.
 
 ## Cost
 
-$0/month. The tunnel edge is a free Cloudflare Tunnel, a free ngrok static domain, or
-an SSH reverse tunnel to a VPS you already own. Tool calls are unlimited because you
-own the relay.
+$0/month. The edge is a free Cloudflare Tunnel, a free ngrok static domain (note:
+ngrok free publishes ~20k HTTP requests/month and 1GB transfer limits — a real but
+generous ceiling), or an SSH reverse tunnel to a VPS you already own. Tool calls are
+unmetered because you own the relay.
 
 ## Status
 
-Design phase. See [DESIGN.md](DESIGN.md) for the full design package, alternatives
-considered, threat model, and open questions. Implementation is gated on design
-validation.
+Design synthesized from a 4-candidate arena plus independent Codex review. See
+[DESIGN.md](DESIGN.md) for the full package and [SYNTHESIS.md](SYNTHESIS.md) for the
+pick/graft record. Implementation starts with `scripts/spike.ts` to prove the one
+load-bearing SDK assumption.
 
 ## Links
 
