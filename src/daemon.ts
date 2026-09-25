@@ -188,6 +188,13 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
   if (auth === null) { authFailed(); send(res, 404); return; }
   const { principal, credential } = auth;
 
+  res.once('finish', () => audit('http.request', {
+    principalId: principal.id,
+    route,
+    method: req.method,
+    status: res.statusCode,
+  }));
+
   if (!bucketAllow(principal.id, principal.ratePerMinute)) { send(res, 429); return; }
 
   if (route === 'healthz') {

@@ -39,6 +39,12 @@ case "$cmd" in
   audit)
     [ -f "${CONFIG_DIR}/audit.jsonl" ] && tail -f "${CONFIG_DIR}/audit.jsonl" || die "no audit log yet"
     ;;
+  dashboard)
+    [ "${1:-}" = "" ] || [ "$1" = "--no-open" ] || die "usage: dc-relayctl dashboard [--no-open]"
+    dashboard_path="$(DESKTOP_RELAY_CONFIG="$CONFIG" node "${REPO}/src/dashboard.ts")"
+    echo "$dashboard_path"
+    [ "${1:-}" = "--no-open" ] || open "$dashboard_path"
+    ;;
   restart)
     launchctl kickstart -k "gui/$(id -u)/${LABEL}" && echo "restarted ${LABEL}"
     ;;
@@ -64,6 +70,7 @@ usage: dc-relayctl <command>
   list                                principals + credential metadata
   url                                 endpoint shapes for clients
   logs | audit                        tail daemon logs / audit trail
+  dashboard [--no-open]               refresh local daily/monthly usage dashboard
   restart                             kickstart the daemon
   doctor                              listener ownership + LAN exposure check
 EOF

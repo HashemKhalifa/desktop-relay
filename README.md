@@ -152,6 +152,20 @@ scripts/verify.sh https://dc.khalifah.uk
 is stopped, run `bin/dc-relayctl restart`; if the Mac is asleep, offline, or logged
 out, the public endpoint may be unavailable until it wakes and the user logs in.
 
+### Local usage dashboard
+
+Run `bin/dc-relayctl dashboard` on the Mac to refresh and open a local HTML report.
+It shows authenticated MCP request counts, tool calls, and health checks for today,
+this month, the last 14 days, and the last 12 months. Run the command again to
+refresh; `--no-open` only writes the report to
+`~/.config/desktop-relay/dashboard.html`.
+
+The report is generated from the metadata-only audit file and its previous rotated
+file. Tool-call history already in the audit is included; request counts begin with
+the request-audit event added alongside this dashboard. Older HTTP requests cannot
+be backfilled, and the relay cannot count ChatGPT tokens or model costs. The report
+stays on the Mac and is not served by the public tunnel.
+
 Lifecycle:
 
 ```bash
