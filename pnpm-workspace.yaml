@@ -1,0 +1,7 @@
+packages:
+  - .
+onlyBuiltDependencies:
+  - puppeteer
+  - sharp
+ignoredBuiltDependencies:
+  - '@wonderwhy-er/desktop-commander'

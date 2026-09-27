@@ -8,7 +8,7 @@ CONFIG="${CONFIG_DIR}/config.json"
 LOGDIR="${HOME}/Library/Logs/desktop-relay"
 PLIST_DIR="${HOME}/Library/LaunchAgents"
 
-EDGE="ngrok"; DOMAIN=""; VPS_HOST=""; VPS_PORT="2222"; WITH_POWER=0
+EDGE="cloudflare"; DOMAIN=""; VPS_HOST=""; VPS_PORT="2222"; WITH_POWER=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --edge) EDGE="$2"; shift 2;;
@@ -26,7 +26,8 @@ NODE_MAJOR=$(node -e 'console.log(process.versions.node.split(".")[0])')
 [ "$NODE_MAJOR" -ge 24 ] || { echo "node >= 24 required (found $(node -v))"; exit 1; }
 
 UPSTREAM_ENTRY="$REPO/node_modules/@wonderwhy-er/desktop-commander/dist/index.js"
-[ -f "$UPSTREAM_ENTRY" ] || (cd "$REPO" && npm ci)
+command -v pnpm >/dev/null || { echo "pnpm required (see README)"; exit 1; }
+(cd "$REPO" && pnpm install --frozen-lockfile)
 
 mkdir -p "$CONFIG_DIR" "$LOGDIR" "$PLIST_DIR"
 chmod 700 "$CONFIG_DIR"

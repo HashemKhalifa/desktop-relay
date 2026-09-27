@@ -1,9 +1,15 @@
 {
-  "edge": { "kind": "ngrok", "domain": "<your-static>.ngrok-free.app" },
-  "publicBaseUrl": "https://<your-static>.ngrok-free.app",
+  "edge": {
+    "kind": "cloudflare",
+    "domain": "mcp.example.com"
+  },
+  "publicBaseUrl": "https://mcp.example.com",
   "listenHost": "127.0.0.1",
   "listenPort": 8788,
-  "upstreamCmd": ["/usr/local/bin/node", "/ABSOLUTE/PATH/desktop-relay/node_modules/@wonderwhy-er/desktop-commander/dist/index.js"],
+  "upstreamCmd": [
+    "/usr/local/bin/node",
+    "/ABSOLUTE/PATH/desktop-relay/node_modules/@wonderwhy-er/desktop-commander/dist/index.js"
+  ],
   "upstreamCwd": "~",
   "secretsPath": "~/.config/desktop-relay/principals.json",
   "auditPath": "~/.config/desktop-relay/audit.jsonl",
@@ -13,6 +19,7 @@
   "uploadDeadlineMs": 10000,
   "maxBodyBytes": 16777216,
   "maxConcurrentPosts": 32,
-  "maxSessions": 64,
-  "logDir": "~/Library/Logs/desktop-relay"
+  "maxSessions": 300,
+  "logDir": "~/Library/Logs/desktop-relay",
+  "dashboardPort": 8789
 }

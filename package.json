@@ -14,6 +14,11 @@
   "scripts": {
     "daemon": "node src/daemon.ts",
     "ctl": "node src/ctl.ts",
-    "verify": "scripts/verify.sh"
-  }
+    "verify": "scripts/verify.sh",
+    "test": "node --test test/*.test.ts",
+    "check:shell": "for file in install.sh uninstall.sh bin/dc-relayctl scripts/*.sh; do bash -n \"$file\" || exit; done",
+    "check": "pnpm test && pnpm run check:shell",
+    "verify:context": "node scripts/verify-context.ts"
+  },
+  "packageManager": "pnpm@10.34.5"
 }

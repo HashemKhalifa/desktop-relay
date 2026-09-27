@@ -33,13 +33,16 @@ exact-pinned.
 
 ## Install with Cloudflare
 
-Requires macOS, Node 24, `cloudflared`, and a domain managed by Cloudflare.
+Requires macOS, Node 24 or newer, pnpm 10, `cloudflared`, and a domain managed by Cloudflare.
 Use your own hostname in place of `dc.khalifah.uk` for another installation.
+
+Install pnpm if needed with `npm install --global pnpm@10.34.5`. The repository
+pins its package-manager version in `package.json`.
 
 ```bash
 git clone git@github.com:HashemKhalifa/desktop-relay.git
 cd desktop-relay
-npm ci
+pnpm install --frozen-lockfile
 ```
 
 On the Mac, log in to Cloudflare and create the tunnel and DNS route once:
@@ -210,7 +213,7 @@ repository directory:
 
 ```bash
 git pull --ff-only
-npm ci
+pnpm install --frozen-lockfile
 bin/dc-relayctl restart
 bin/dc-relayctl doctor
 ```
@@ -268,6 +271,11 @@ tool call; check the outcome of any interrupted call before issuing another.
   running the daemon. Trusted clients of one operator — not isolation. Rotate/revoke
   via the daemon's control socket (`~/.config/desktop-relay/control.sock`, mode 0600);
   revoking closes live sessions.
+
+## Development
+
+See [Contributing](CONTRIBUTING.md) for the project layout, local checks, and
+dependency-update workflow.
 
 ## Docs
 
