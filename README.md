@@ -121,6 +121,8 @@ risk annotations, and UI metadata remain intact. Unrecognized tools retain their
 upstream description. ChatGPT still controls
 action approvals, and its saved tool definitions may need refreshing after an update.
 
+For connection errors, follow [Connection recovery](docs/TROUBLESHOOTING.md).
+
 ### After a Mac or daemon restart
 
 After logging in to macOS, the launch agents start the daemon and Cloudflare tunnel.
