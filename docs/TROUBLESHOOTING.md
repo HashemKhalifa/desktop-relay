@@ -93,8 +93,12 @@ bin/dc-relayctl dashboard
 ```
 
 This checks the live dashboard server and opens an authenticated page at
-`http://127.0.0.1:8789`. Use the command again if the dashboard cookie expired or you
-changed browser profiles. Opening the bare URL does not establish authentication.
+`http://127.0.0.1:8789`. The dashboard renews its one-day cookie after each authenticated refresh. Use the
+command again after more than a day away, if browser cookies were cleared, or if you
+changed browser profiles. Opening the bare URL does not establish authentication. Missing authentication or
+a failed initial connection shows usage as unavailable, rather than zero counts.
+Zero MCP sessions with a running upstream means the relay is idle; it does not
+mean the server is disconnected.
 
 If the command cannot reach the server, check daemon status and restart only if
 needed. `dashboard --no-open` exports a static report; it does not start the live

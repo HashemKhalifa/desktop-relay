@@ -37,7 +37,11 @@ test('live dashboard binds loopback, authenticates snapshots and rejects foreign
     assert.equal(snapshot.status.sessions, 2);
     assert.equal(snapshot.marker, 'desktop-relay-dashboard');
     assert.ok(!snapshot.html.includes(key));
-    assert.match(await (await fetch(`${base}/`)).text(), /Connecting/);
+    assert.match(response.headers.get('set-cookie')!, /Max-Age=86400/);
+    const initial = await (await fetch(`${base}/`)).text();
+    assert.match(initial, /Loading usage/);
+    assert.ok(!initial.includes('data-metric='));
+    assert.ok(!initial.includes(key));
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));

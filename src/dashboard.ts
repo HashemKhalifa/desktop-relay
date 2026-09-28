@@ -79,9 +79,9 @@ function activityChart(keys: string[], data: Map<string, Counts>): string {
   return `<div class="chart"><div class="chart-grid">${bars}</div><div class="chart-labels" aria-hidden="true">${keys.map((key) => `<span>${key.slice(5).replace('-', '/')}</span>`).join('')}</div></div>`;
 }
 
-export function render(data: Awaited<ReturnType<typeof collect>>, now: Date, live = false): string {
-  const today = data.days.get(dayKey(now)) ?? empty();
-  const month = data.months.get(monthKey(now)) ?? empty();
+export function render(data: Awaited<ReturnType<typeof collect>> | null, now: Date, live = false): string {
+  const today = data?.days.get(dayKey(now)) ?? empty();
+  const month = data?.months.get(monthKey(now)) ?? empty();
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const styles = fs.readFileSync(new URL('./dashboard.css', import.meta.url), 'utf8');
   return `<!doctype html>
@@ -91,7 +91,7 @@ export function render(data: Awaited<ReturnType<typeof collect>>, now: Date, liv
 <body><div class="relay">
 <header class="masthead"><div class="brand"><span class="brand-mark" aria-hidden="true">Ⅱ</span> Desktop Relay</div><span class="pill" id="connection-status" role="status">${live ? 'Connecting…' : 'Usage snapshot'}</span></header>
 <main>
-<div class="intro"><div><div class="eyebrow">Your Mac · Your infrastructure</div><h1>Usage overview</h1><p>Daily and monthly activity on your Mac.</p></div><div class="timestamp">Generated · ${zone}<time datetime="${now.toISOString()}">${now.toLocaleString()}</time></div></div>
+${data === null ? '<section class="intro" role="status"><div><h1>Loading usage…</h1><p id="loading-message">Connecting to the local relay. Counts appear after authentication.</p><noscript>Enable JavaScript to load the live dashboard.</noscript></div></section>' : `<div class="intro"><div><div class="eyebrow">Your Mac · Your infrastructure</div><h1>Usage overview</h1><p>Daily and monthly activity on your Mac.</p></div><div class="timestamp">Generated · ${zone}<time datetime="${now.toISOString()}">${now.toLocaleString()}</time></div></div>
 <section class="metrics" aria-label="Usage totals">
 <div class="metric"><span class="metric-label">MCP requests today</span><strong data-metric="today-mcp">${today.mcp}</strong><span class="metric-note">Authenticated requests · ${dayKey(now)}</span></div>
 <div class="metric"><span class="metric-label">Tool calls today</span><strong data-metric="today-tools">${today.tools}</strong><span class="metric-note">Commands dispatched to Desktop Commander</span></div>
@@ -106,6 +106,7 @@ ${rows(periodKeys(now, 14, 'day'), data.days)}
 ${rows(periodKeys(now, 12, 'month'), data.months)}
 </tbody></table></div></section></div>
 <section class="panel"><div class="retained"><span>Result JSON delivered <strong data-metric="result-bytes">${(data.total.resultBytes / 1024).toFixed(1)} KiB</strong></span><span>Large outputs retained <strong data-metric="offloaded">${data.total.offloaded}</strong></span><span>Retained requests <strong data-metric="all-mcp">${data.total.mcp}</strong></span><span>Retained tool calls <strong data-metric="all-tools">${data.total.tools}</strong></span><span>Health checks today <strong data-metric="today-health">${today.health}</strong></span></div><div class="notes"><details><summary>What these numbers include</summary><p>Requests are completed authenticated MCP HTTP requests, including failed responses. Health checks are separate. Tool calls count dispatches, including calls whose outcome may be unknown. Multiple protocol requests may support one tool call.</p><p>Counts cover the current and previous retained audit files. A zero means no recorded events in those files; it does not establish no activity before logging began or after older logs were removed. Earlier HTTP requests cannot be reconstructed. Result JSON includes tool responses and retrieved pages since byte auditing was enabled; it is a traffic measurement, not a token count. ChatGPT token usage and model costs are not available to this relay.</p></details><div class="refresh"><span>Refresh and reopen from the relay folder</span><code>bin/dc-relayctl dashboard</code></div></div></section>
+`}
 </main><footer><span>Private report · stored on this Mac</span><span>${live ? 'Refreshes on return · every 10 seconds while visible' : 'Snapshot, updated when you run the command'}</span></footer>
 </div>${live ? '<script src="/live.js"></script>' : ''}</body></html>`;
 }
