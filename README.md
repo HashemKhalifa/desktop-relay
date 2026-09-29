@@ -179,6 +179,33 @@ HTML, so the report remains a single file with no build step or external assets.
 Result bytes measure JSON traffic, including retained-result page reads, not model
 tokens.
 
+### File previews in ChatGPT
+
+![Desktop Relay file viewer showing a synthetic source file](docs/images/file-viewer.png)
+
+File reads open as a compact **Desktop Relay** card with a matching app icon.
+Click **Open file** to browse local text and source files. The viewer reads up to
+200 lines at a time and includes line navigation, search within the current range,
+wrapping, copy, download, and an expanded view where the host supports it.
+
+**Refresh** rereads the displayed range and reports changes. Browsing reads the
+current file on the Mac; it can differ from an earlier tool result. Copy and
+download contain the displayed range, not the entire file. Media is still available
+in the original tool result.
+
+Preview reads use an authenticated app-only tool, with file contents in
+component-only metadata. Expanding a preview does not send its file text as a
+model-facing tool result. The ordinary `read_file` result still supplies text to
+the model. The dashboard distinguishes model dispatches, preview reads, and
+component payload bytes; older calls remain unclassified.
+
+After updating and restarting the relay, refresh Desktop Relay's tool definitions
+in ChatGPT and make a new file read. Existing cards may use the old viewer. The
+relay advertises its icon through MCP server metadata; whether it replaces the
+connector's icon in ChatGPT's menus depends on the host.
+
+See [file viewer design and verification](docs/FILE_VIEWER.md).
+
 ### Large tool results and context
 
 Plain-text results above 16 KiB return a short preview and a result ID. Use

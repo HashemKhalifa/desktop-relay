@@ -15,6 +15,8 @@ import { grantedToolNames } from './policy.ts';
 import { describeTool } from './tool-descriptions.ts';
 import { readResultTool, resultBytes, type ResultStore } from './results.ts';
 import type { Upstream } from './upstream.ts';
+import { browseFileTool, fileReadArgs, fileViewResult, fileViewerResource, fileViewerUri, withFileViewer } from './file-viewer.ts';
+import { relayIcons } from './brand.ts';
 
 export interface Session {
   id: string | undefined;
@@ -44,7 +46,7 @@ function grantedResourceUris(ctx: SessionCtx, grants: Set<string>): Set<string> 
   const uris = new Set<string>();
   for (const tool of ctx.upstream.toolInventory()) {
     if (!grants.has(tool.name)) continue;
-    const meta = tool._meta as Record<string, unknown> | undefined;
+    const meta = withFileViewer(tool)._meta as Record<string, unknown> | undefined;
     const ui = meta?.ui as Record<string, unknown> | undefined;
     for (const uri of [meta?.['ui/resourceUri'], meta?.['openai/outputTemplate'], ui?.resourceUri]) {
       if (typeof uri === 'string') uris.add(uri);
@@ -97,12 +99,12 @@ export function createSession(ctx: SessionCtx, principal: Principal, credential:
   });
 
   const server = new Server(
-    { name: 'desktop-relay', version: ctx.version },
+    { name: 'desktop-relay', title: 'Desktop Relay', version: ctx.version, icons: relayIcons },
     { capabilities: { tools: {}, resources: {} } },
   );
 
   server.setRequestHandler(ListToolsRequestSchema, () => ({
-    tools: [...ctx.upstream.toolInventory().filter((t) => session.grants.has(t.name)).map(describeTool), ...(session.grants.size ? [readResultTool] : [])],
+    tools: [...ctx.upstream.toolInventory().filter((t) => session.grants.has(t.name)).map(describeTool).map(withFileViewer), ...(session.grants.size ? [readResultTool] : []), ...(session.grants.has('read_file') ? [browseFileTool] : [])],
   }));
 
   server.setRequestHandler(ListResourcesRequestSchema, async (req, extra) => {
@@ -110,13 +112,14 @@ export function createSession(ctx: SessionCtx, principal: Principal, credential:
     const page = await client.listResources(req.params ?? {}, { signal: extra.signal, timeout: ctx.rpcDeadlineMs });
     if (generation !== ctx.upstream.generation) throw new McpError(ErrorCode.InvalidRequest, 'upstream changed');
     const allowed = grantedResourceUris(ctx, session.grants);
-    return { ...page, resources: page.resources.filter((resource) => allowed.has(resource.uri)) };
+    return { ...page, resources: [...page.resources.filter((resource) => allowed.has(resource.uri)), ...(session.grants.has('read_file') && !req.params?.cursor ? [{ uri: fileViewerUri, name: 'Desktop Relay file viewer', mimeType: 'text/html;profile=mcp-app' }] : [])] };
   });
 
   server.setRequestHandler(ReadResourceRequestSchema, async (req, extra) => {
     if (!grantedResourceUris(ctx, session.grants).has(req.params.uri)) {
       throw new McpError(ErrorCode.InvalidRequest, 'resource not available');
     }
+    if (req.params.uri === fileViewerUri) return fileViewerResource();
     const { client, generation } = ctx.upstream.getClient();
     const result = await client.readResource(req.params, { signal: extra.signal, timeout: ctx.rpcDeadlineMs });
     if (generation !== ctx.upstream.generation) throw new McpError(ErrorCode.InvalidRequest, 'upstream changed');
@@ -134,16 +137,19 @@ export function createSession(ctx: SessionCtx, principal: Principal, credential:
       ctx.audit('result.read', { principalId: session.principalId, ...resultBytes(result) });
       return result;
     }
-    if (!session.grants.has(name)) {
+    const browsing = name === browseFileTool.name;
+    if (!session.grants.has(browsing ? 'read_file' : name)) {
       ctx.audit('tool.denied', { principalId: session.principalId, credentialId: session.credentialId, sessionId: session.id, tool: name });
       throw new McpError(ErrorCode.MethodNotFound, 'tool not available');
     }
+    const viewArgs = browsing ? fileReadArgs(req.params.arguments ?? {}) : undefined;
+    const audience = browsing ? 'app' : req.params.arguments?.origin === 'ui' ? 'legacy-ui' : 'model';
     const { client, generation } = ctx.upstream.getClient();
     const started = Date.now();
-    ctx.audit('tool.call', { principalId: session.principalId, credentialId: session.credentialId, sessionId: session.id, generation, tool: name });
+    ctx.audit('tool.call', { principalId: session.principalId, credentialId: session.credentialId, sessionId: session.id, generation, tool: name, audience });
     const progressToken = (req.params._meta as { progressToken?: string | number } | undefined)?.progressToken;
     const result = await client.request(
-      { method: 'tools/call', params: req.params },
+      { method: 'tools/call', params: browsing ? { ...req.params, name: 'read_file', arguments: viewArgs } : req.params },
       CompatibilityCallToolResultSchema,
       {
         timeout: ctx.rpcDeadlineMs,
@@ -160,14 +166,15 @@ export function createSession(ctx: SessionCtx, principal: Principal, credential:
             },
       },
     );
-    const output = req.params.arguments?.origin === 'ui' || ctx.upstream.toolInventory().find((t) => t.name === name)?.outputSchema
+    if (generation !== ctx.upstream.generation || !credentialValid(ctx.storeRef.current, session.credentialId)) throw new McpError(ErrorCode.InvalidRequest, 'session changed; re-initialize. The command outcome may be unknown; do not replay it.');
+    const output = viewArgs ? fileViewResult(result, viewArgs) : req.params.arguments?.origin === 'ui' || ctx.upstream.toolInventory().find((t) => t.name === name)?.outputSchema
       ? result : ctx.results.compact(session.principalId, name, result);
     const originalSize = resultBytes(result);
     ctx.audit('tool.result', {
-      principalId: session.principalId, sessionId: session.id, tool: name, ms: Date.now() - started,
+      principalId: session.principalId, sessionId: session.id, tool: name, audience, ms: Date.now() - started,
       ...(output === result ? originalSize : resultBytes(output)), originalBytes: originalSize.resultBytes,
       argumentBytes: Buffer.byteLength(JSON.stringify(req.params.arguments ?? {})),
-      offloaded: output !== result, isError: result.isError === true,
+      offloaded: !browsing && output !== result, isError: output.isError === true,
     });
     return output;
   });

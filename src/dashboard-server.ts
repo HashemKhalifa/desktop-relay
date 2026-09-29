@@ -20,7 +20,7 @@ export function startDashboard(config: { directory: string; auditPath: string; p
       res.setHeader('cache-control', 'no-store');
       res.setHeader('x-content-type-options', 'nosniff');
       res.setHeader('referrer-policy', 'no-referrer');
-      res.setHeader('content-security-policy', "default-src 'none'; style-src 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'");
+      res.setHeader('content-security-policy', "default-src 'none'; style-src 'unsafe-inline'; script-src 'self'; connect-src 'self'; img-src data:; frame-ancestors 'none'");
       const address = server.address();
       const host = `127.0.0.1:${typeof address === 'object' && address ? address.port : config.port}`;
       if (req.headers.host !== host || (req.headers.origin && req.headers.origin !== `http://${host}`) || req.headers['sec-fetch-site'] === 'cross-site') { res.writeHead(403).end(); return; }
