@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Desktop Relay · File viewer</title><!-- styles --></head>
+<body><main class="viewer">
+  <header class="file-card">
+    <img class="logo" src="{{icon}}" width="40" height="40" alt="Desktop Relay">
+    <div class="file-heading"><div class="eyebrow">Desktop Relay <span class="file-type" id="file-type">FILE</span></div><h1 id="filename">File preview</h1><p id="file-path">Waiting for file details…</p></div>
+    <button id="open" class="primary" aria-expanded="false" aria-controls="workspace" disabled>Open file <span aria-hidden="true">↗</span></button>
+  </header>
+  <section id="workspace" hidden aria-label="File contents">
+    <div class="toolbar">
+      <label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Find in this range" aria-label="Find in this range"><span id="matches"></span></label>
+      <div class="actions"><button id="wrap" aria-pressed="false">Wrap</button><button id="copy" disabled>Copy</button><button id="download" disabled>Download range</button><button id="fullscreen" title="Expand viewer" aria-label="Expand viewer">⤢</button></div>
+    </div>
+    <div class="range-bar"><span id="range">No range loaded</span><span class="read-only">Read only</span></div>
+    <p id="notice" role="status" hidden></p>
+    <div id="code" class="code" tabindex="0" aria-label="File text"></div>
+    <footer>
+      <div class="navigation"><button id="previous" disabled aria-label="Previous range">←</button><button id="next" disabled aria-label="Next range">→</button><div class="jump"><label>Line <input id="line" type="number" min="1" value="1" aria-label="Go to line"></label><button id="jump" type="button">Go</button></div><label class="page-size"><select id="page-size" aria-label="Lines per page"><option value="50">50 lines</option><option value="100">100 lines</option><option value="200" selected>200 lines</option></select></label></div>
+      <div class="freshness"><span id="read-at">Reads only when opened</span><button id="refresh">Refresh</button></div>
+    </footer>
+  </section>
+  <div id="card-note" class="card-note">Browse on demand · read only</div>
+</main><!-- script --></body></html>

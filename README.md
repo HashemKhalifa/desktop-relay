@@ -1,9 +1,19 @@
-# desktop-relay
+<img src="assets/icon.svg" alt="Desktop Relay icon" width="64" height="64">
+
+# Desktop Relay
 
 Self-hosted replacement for the paid [Desktop Commander Remote MCP](https://mcp.desktopcommander.app)
 relay. Run [Desktop Commander MCP](https://github.com/wonderwhy-er/desktopcommandermcp)
 on your own machine behind your own authenticated HTTPS endpoint, with no monthly
 tool-call quota.
+
+[Install](#install-with-cloudflare) · [ChatGPT setup](#chatgpt) ·
+[Recovery](docs/TROUBLESHOOTING.md) · [Releases](https://github.com/HashemKhalifa/desktop-relay/releases)
+
+The supported installation runs on a Mac that is awake, online, and logged in.
+This is access to your existing OS account: a client with command-execution
+permission can run commands with that account's privileges. Use it with trusted
+clients. Each installation serves one shared machine.
 
 ![Desktop Relay usage dashboard with sample daily and monthly activity](docs/images/dashboard.png)
 
@@ -124,6 +134,12 @@ risk annotations, and UI metadata remain intact. Unrecognized tools retain their
 upstream description. ChatGPT still controls
 action approvals, and its saved tool definitions may need refreshing after an update.
 
+To refresh them, open **Plugins → Desktop Relay → More actions → Manage →
+Refresh tools**. Reload the app details page if it still shows old descriptions,
+then start a new chat. This updates the existing connection without replacing
+its credential. The plugin's displayed version and the relay's source version
+are separate; the installed tool list is the useful check.
+
 For connection errors, follow [Connection recovery](docs/TROUBLESHOOTING.md).
 
 ### After a Mac or daemon restart
@@ -146,6 +162,12 @@ scripts/verify.sh https://dc.khalifah.uk
 `doctor` should show `127.0.0.1:8788` listening and no LAN listener. If the daemon
 is stopped, run `bin/dc-relayctl restart`; if the Mac is asleep, offline, or logged
 out, the public endpoint may be unavailable until it wakes and the user logs in.
+
+Wait for `status` to report `upstream: running` after a restart. The control socket
+can answer before the MCP listener is ready. **Zero MCP sessions is normal when
+no client has initialized a session.** It is a count of open protocol sessions,
+not a server-health indicator. Starting a new ChatGPT request establishes a session;
+you do not need to recreate the app or mint another credential after a restart.
 
 Idle MCP sessions expire after 15 minutes. At the 300-session default limit, the relay can
 reclaim the oldest session idle for at least one minute; in-flight requests are
@@ -178,6 +200,33 @@ define the colors. Styles are scoped under `.relay` and embedded in the generate
 HTML, so the report remains a single file with no build step or external assets.
 Result bytes measure JSON traffic, including retained-result page reads, not model
 tokens.
+
+### File previews in ChatGPT
+
+![Desktop Relay file viewer showing a synthetic source file](docs/images/file-viewer.png)
+
+File reads open as a compact **Desktop Relay** card with a matching app icon.
+Click **Open file** to browse local text and source files. The viewer reads up to
+200 lines at a time and includes line navigation, search within the current range,
+wrapping, copy, download, and an expanded view where the host supports it.
+
+**Refresh** rereads the displayed range and reports changes. Browsing reads the
+current file on the Mac; it can differ from an earlier tool result. Copy and
+download contain the displayed range, not the entire file. Media is still available
+in the original tool result.
+
+Preview reads use an authenticated app-only tool, with file contents in
+component-only metadata. Expanding a preview does not send its file text as a
+model-facing tool result. The ordinary `read_file` result still supplies text to
+the model. The dashboard distinguishes model dispatches, preview reads, and
+component payload bytes; older calls remain unclassified.
+
+After updating and restarting the relay, refresh Desktop Relay's tool definitions
+in ChatGPT and make a new file read. Existing cards may use the old viewer. The
+relay advertises its icon through MCP server metadata; whether it replaces the
+connector's icon in ChatGPT's menus depends on the host.
+
+See [file viewer design and verification](docs/FILE_VIEWER.md).
 
 ### Large tool results and context
 
@@ -223,6 +272,23 @@ sessions, terminal output tracking, and retained results; save needed output fir
 Your credentials and Cloudflare setup persist. Refresh the app's tool definitions
 in ChatGPT after tool changes, then start a new chat with **Desktop Relay** selected.
 You do not need to run the installer again for a normal update.
+
+### Versioned releases
+
+[Release notes](https://github.com/HashemKhalifa/desktop-relay/releases) identify the
+source commit, changes, verification, and known limitations for each version.
+[CHANGELOG.md](CHANGELOG.md) summarizes changes in the checkout. Draft releases are
+for review; use a published tag when you want a fixed version instead of `main`.
+
+To install a published version, run `git fetch --tags`, then
+`git switch --detach <release-tag>` before `pnpm install --frozen-lockfile`.
+Replace `<release-tag>` with the version you selected. Preserve local changes
+before switching versions. Updating or rolling back the running service still
+requires a restart.
+
+Releases contain source and the checked-in viewer bundle. There is no npm package,
+auto-updater, or bundled credential. See [Preparing a release](docs/RELEASING.md)
+for the verification and future-publication checklist.
 
 ## Manage the relay
 

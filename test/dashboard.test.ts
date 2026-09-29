@@ -20,8 +20,10 @@ test('dashboard counts requests and tool calls across audit rotation and month b
       JSON.stringify({ ts: today, event: 'http.request', route: 'mcp', method: 'POST', status: 200 }),
       JSON.stringify({ ts: today, event: 'http.request', route: 'mcp', method: 'POST', status: 400 }),
       JSON.stringify({ ts: today, event: 'http.request', route: 'healthz', method: 'GET', status: 200 }),
-      JSON.stringify({ ts: today, event: 'tool.call', tool: 'list_processes', principalId: 'private-id' }),
+      JSON.stringify({ ts: today, event: 'tool.call', tool: 'list_processes', principalId: 'private-id', audience: 'model' }),
       JSON.stringify({ ts: today, event: 'tool.result', tool: 'list_processes' }),
+      JSON.stringify({ ts: today, event: 'tool.call', tool: 'browse_relay_file', audience: 'app' }),
+      JSON.stringify({ ts: today, event: 'tool.result', tool: 'browse_relay_file', resultBytes: 2300, metaBytes: 2048, audience: 'app' }),
       'null',
       'incomplete audit line',
     ].join('\n') + '\n');
@@ -38,10 +40,14 @@ test('dashboard counts requests and tool calls across audit rotation and month b
     const metric = (name: string) => Number(html.match(new RegExp(`data-metric="${name}"[^>]*>(\\d+)<`))?.[1]);
     assert.equal(metric('today-mcp'), 2);
     assert.equal(metric('today-health'), 1);
-    assert.equal(metric('today-tools'), 1);
+    assert.equal(metric('today-tools'), 2);
+    assert.equal(metric('today-model'), 1);
+    assert.equal(metric('today-preview'), 1);
+    assert.equal(metric('today-unclassified'), 0);
+    assert.match(html, /data-metric="today-component-bytes">2.0 KiB/);
     assert.equal(metric('month-mcp'), 2);
     assert.equal(metric('all-mcp'), 3);
-    assert.equal(metric('all-tools'), 2);
+    assert.equal(metric('all-tools'), 3);
     assert.ok(!html.includes('private-id'));
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });

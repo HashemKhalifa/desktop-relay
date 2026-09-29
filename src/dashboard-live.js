@@ -25,6 +25,13 @@ async function refresh() {
   } catch (error) {
     status.textContent = error.name === 'TimeoutError' || error instanceof TypeError ? 'Disconnected · retrying' : error.message;
     status.dataset.state = 'offline';
+    const message = document.getElementById('loading-message');
+    if (message) {
+      document.querySelector('main h1').textContent = 'Usage unavailable';
+      message.textContent = status.textContent === 'Open again with dc-relayctl dashboard'
+        ? 'Dashboard sign-in expired or is missing. Run bin/dc-relayctl dashboard on this Mac to reconnect. Your usage history is preserved.'
+        : 'Cannot load usage from the relay. Retrying automatically; no counts are available yet.';
+    }
   } finally {
     running = false;
   }

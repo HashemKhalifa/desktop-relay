@@ -15,11 +15,12 @@ export const readResultTool: Tool = {
   annotations: { title: 'Read retained result', readOnlyHint: true, destructiveHint: false, openWorldHint: false },
 };
 
-export function resultBytes(result: Result): { resultBytes: number; textBytes: number; structuredBytes: number } {
+export function resultBytes(result: Result): { resultBytes: number; textBytes: number; structuredBytes: number; metaBytes: number } {
   return {
     resultBytes: Buffer.byteLength(JSON.stringify(result)),
     textBytes: Array.isArray(result.content) ? result.content.reduce((sum, block) => sum + (block.type === 'text' ? Buffer.byteLength(block.text) : 0), 0) : 0,
     structuredBytes: result.structuredContent === undefined ? 0 : Buffer.byteLength(JSON.stringify(result.structuredContent)),
+    metaBytes: result._meta === undefined ? 0 : Buffer.byteLength(JSON.stringify(result._meta)),
   };
 }
 

@@ -1,7 +1,9 @@
 packages:
   - .
 onlyBuiltDependencies:
+  - esbuild
   - puppeteer
   - sharp
 ignoredBuiltDependencies:
+  - '@modelcontextprotocol/ext-apps'
   - '@wonderwhy-er/desktop-commander'

@@ -14,11 +14,18 @@ The TypeScript runs directly in Node; there is no compilation step. `pnpm check`
 runs behavioral tests and shell syntax checks. CI runs these on macOS and Linux
 with Node 24 and 26. The installer and LaunchAgents require macOS.
 
+The file viewer's browser bundle is checked in. After editing
+`src/file-viewer-client.js`, run `pnpm build:viewer` and include the updated bundle.
+CI rebuilds it and rejects a stale bundle.
+The daemon itself still needs no build step. See [the viewer guide](docs/FILE_VIEWER.md)
+for browser and MCP acceptance checks.
+
 ## Project layout
 
 | Location | Responsibility |
 | --- | --- |
-| `src/` | Daemon, MCP sessions, upstream process, credentials, policy, result paging, and dashboard |
+| `src/` | Daemon, MCP sessions, upstream process, credentials, policy, result paging, file viewer, and dashboard |
+| `assets/` | Desktop Relay icon and bundled-library licenses |
 | `bin/` | Operator CLI |
 | `test/` | Automated behavioral tests |
 | `scripts/` | Runtime verification and operational helpers |
@@ -60,10 +67,10 @@ there is no auto-merge. Action revisions are pinned by commit SHA.
 
 For MCP SDK or Desktop Commander updates, review schema/annotation changes and the
 compact tool descriptions, then run runtime verification. A green unit-test run
-alone does not establish compatibility with ChatGPT. `pnpm-workspace.yaml` allows the browser and image dependencies (`puppeteer` and
-`sharp`) to run their installation scripts. Desktop Commander's postinstall hook
-includes installation telemetry and is explicitly skipped. Review additional
-build-script allowances before enabling them.
+alone does not establish compatibility with ChatGPT. `pnpm-workspace.yaml` allows
+`puppeteer`, `sharp`, and `esbuild` to run their installation scripts. Desktop
+Commander's telemetry hook and the MCP Apps SDK's development-environment setup
+hook are skipped. Review additional build-script allowances before enabling them.
 
 ## Installation and releases
 
@@ -75,3 +82,6 @@ Follow the README's update and recovery instructions instead.
 Version tags identify release source. Keep published tags unchanged; use a new
 version for subsequent releases. Never commit local credentials, keys, audit logs,
 or machine-specific runtime configuration.
+
+Follow [Preparing a release](docs/RELEASING.md) for versioning, verification,
+draft notes, and the checks required before making the repository public.
