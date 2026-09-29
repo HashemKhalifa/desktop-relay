@@ -82,3 +82,6 @@ Follow the README's update and recovery instructions instead.
 Version tags identify release source. Keep published tags unchanged; use a new
 version for subsequent releases. Never commit local credentials, keys, audit logs,
 or machine-specific runtime configuration.
+
+Follow [Preparing a release](docs/RELEASING.md) for versioning, verification,
+draft notes, and the checks required before making the repository public.

@@ -74,3 +74,19 @@ recovered 48,065 file bytes and 48,325 command bytes exactly; the scratch comman
 executed once. Nine automated tests and shell checks passed after a frozen pnpm
 install. These checks do not establish that the new UI has been activated in a
 particular ChatGPT connection.
+
+## ChatGPT activation check
+
+On September 29, 2026, the running v0.2.0 candidate passed a fresh ChatGPT check
+after **Refresh tools** on the existing app. A synthetic 420-line TypeScript file
+opened in the new viewer with its icon. Next reached ranges 201–400 and 401–420,
+with Next disabled at EOF. Go returned to line 1. After the fixture changed on
+disk, Refresh displayed the new marker and reported that the range changed.
+The original model response retained its earlier marker.
+
+![The new file viewer running inside ChatGPT after Refresh](images/chatgpt-file-viewer.png)
+
+The saved app initially contained old tool descriptions. Refreshing tools and
+reloading its details replaced them with the compact catalogue, including
+`read_relay_result` and `browse_relay_file`. Updating the daemon alone did not
+update ChatGPT's saved definitions. Menu-icon display remains host-dependent.
