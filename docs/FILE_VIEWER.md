@@ -1,6 +1,7 @@
 # File viewer
 
-`read_file` returns model-facing text without renderer metadata. An explicit
+Normal upstream tools return data without renderer metadata, including `read_file`,
+`get_config`, `list_directory`, `write_file`, and `edit_block`. An explicit
 request to open or preview a file uses `preview_relay_file`, which advertises the
 relay-owned MCP Apps resource and creates a compact card. Expanding the card reads
 up to 200 lines through `browse_relay_file`. Creating or mounting a collapsed card
@@ -27,6 +28,12 @@ the original `read_file` result; the new text viewer does not render media.
   the range but does not read disk. `browse_relay_file` validates it and invokes
   the existing shared Desktop Commander client once. Desktop Commander's
   path checks remain authoritative. The helper does not read the filesystem directly.
+- Old upstream widgets may call tools with `origin: "ui"` when restored. These
+  calls receive a terminal tool error before reaching Desktop Commander, including
+  repeated calls. They do not reread files, change config, or run commands.
+  The relay-owned `browse_relay_file` helper remains available for explicit browsing.
+  This prevents duplicate upstream work; it does not control ChatGPT's own HTTP
+  request limit or prove the cause of a ChatGPT-side 429.
 - Preview calls accept only an absolute local path, an integer offset, and 1–200
   lines. Tail reads are limited to 200 lines. Responses over 256 KiB are rejected
   with an explicit message. URLs and unrecognized arguments are rejected.
@@ -56,8 +63,9 @@ are development dependencies only. HTML and CSS are loaded directly from `src/`.
 and tests actual MCP sessions: exact Unicode ranges, end-of-file and tail reads,
 changed content, invalid inputs, denied grants/resources, component-only payloads,
 icon metadata, and executable resource JavaScript. It also checks that ordinary
-reads have no renderer aliases and creating an explicit card makes no upstream
-file call. No production child is restarted.
+tools have no renderer aliases, creating an explicit card makes no upstream file
+call, and repeated legacy-widget calls make no upstream calls. It also verifies
+that normal directory listings and config reads work. No production child is restarted.
 
 Browser acceptance: run an ordinary `read_file`, verify the answer is visible
 without a viewer, and reload the chat to confirm it stays visible. Then explicitly

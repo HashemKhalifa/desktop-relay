@@ -24,10 +24,10 @@ export const previewFileTool: Tool = {
     'openai/outputTemplate': fileViewerUri },
 };
 
-export function withFileViewer(tool: Tool): Tool {
-  if (tool.name !== 'read_file') return tool;
-  // Upstream also advertises a file widget. Strip every renderer alias so a
-  // routine read cannot open either viewer when ChatGPT restores the chat.
+export function withoutAutomaticWidget(tool: Tool): Tool {
+  if (!tool._meta) return tool;
+  // Only explicit relay previews should mount widgets. Upstream widgets can
+  // reread files and config when ChatGPT restores an old conversation.
   const meta = { ...tool._meta };
   delete meta['ui/resourceUri'];
   delete meta['openai/outputTemplate'];

@@ -15,7 +15,7 @@ import { grantedToolNames } from './policy.ts';
 import { describeTool } from './tool-descriptions.ts';
 import { readResultTool, resultBytes, type ResultStore } from './results.ts';
 import type { Upstream } from './upstream.ts';
-import { browseFileTool, fileReadArgs, fileViewResult, fileViewerResource, fileViewerUri, previewFileTool, withFileViewer } from './file-viewer.ts';
+import { browseFileTool, fileReadArgs, fileViewResult, fileViewerResource, fileViewerUri, previewFileTool, withoutAutomaticWidget } from './file-viewer.ts';
 import { relayIcons } from './brand.ts';
 
 export interface Session {
@@ -46,7 +46,7 @@ function grantedResourceUris(ctx: SessionCtx, grants: Set<string>): Set<string> 
   const uris = new Set<string>(grants.has('read_file') ? [fileViewerUri] : []);
   for (const tool of ctx.upstream.toolInventory()) {
     if (!grants.has(tool.name)) continue;
-    const meta = withFileViewer(tool)._meta as Record<string, unknown> | undefined;
+    const meta = withoutAutomaticWidget(tool)._meta as Record<string, unknown> | undefined;
     const ui = meta?.ui as Record<string, unknown> | undefined;
     for (const uri of [meta?.['ui/resourceUri'], meta?.['openai/outputTemplate'], ui?.resourceUri]) {
       if (typeof uri === 'string') uris.add(uri);
@@ -104,7 +104,7 @@ export function createSession(ctx: SessionCtx, principal: Principal, credential:
   );
 
   server.setRequestHandler(ListToolsRequestSchema, () => ({
-    tools: [...ctx.upstream.toolInventory().filter((t) => session.grants.has(t.name)).map(describeTool).map(withFileViewer), ...(session.grants.size ? [readResultTool] : []), ...(session.grants.has('read_file') ? [previewFileTool, browseFileTool] : [])],
+    tools: [...ctx.upstream.toolInventory().filter((t) => session.grants.has(t.name)).map(describeTool).map(withoutAutomaticWidget), ...(session.grants.size ? [readResultTool] : []), ...(session.grants.has('read_file') ? [previewFileTool, browseFileTool] : [])],
   }));
 
   server.setRequestHandler(ListResourcesRequestSchema, async (req, extra) => {
@@ -143,6 +143,10 @@ export function createSession(ctx: SessionCtx, principal: Principal, credential:
       ctx.audit('tool.denied', { principalId: session.principalId, credentialId: session.credentialId, sessionId: session.id, tool: name });
       throw new McpError(ErrorCode.MethodNotFound, 'tool not available');
     }
+    if (!browsing && req.params.arguments?.origin === 'ui') {
+      ctx.audit('tool.denied', { principalId: session.principalId, credentialId: session.credentialId, sessionId: session.id, tool: name, reason: 'legacy-widget' });
+      return { isError: true, content: [{ type: 'text', text: 'Legacy automatic previews are disabled. Use preview_relay_file to open a file explicitly. Do not retry this widget request.' }] };
+    }
     if (previewing) {
       fileReadArgs(req.params.arguments ?? {});
       const card = { content: [{ type: 'text' as const, text: 'File preview ready. Open the card to browse the file. Use read_file if file contents are needed for reasoning.' }] };
@@ -151,7 +155,7 @@ export function createSession(ctx: SessionCtx, principal: Principal, credential:
       return card;
     }
     const viewArgs = browsing ? fileReadArgs(req.params.arguments ?? {}) : undefined;
-    const audience = browsing ? 'app' : req.params.arguments?.origin === 'ui' ? 'legacy-ui' : 'model';
+    const audience = browsing ? 'app' : 'model';
     const { client, generation } = ctx.upstream.getClient();
     const started = Date.now();
     ctx.audit('tool.call', { principalId: session.principalId, credentialId: session.credentialId, sessionId: session.id, generation, tool: name, audience });
@@ -175,7 +179,7 @@ export function createSession(ctx: SessionCtx, principal: Principal, credential:
       },
     );
     if (generation !== ctx.upstream.generation || !credentialValid(ctx.storeRef.current, session.credentialId)) throw new McpError(ErrorCode.InvalidRequest, 'session changed; re-initialize. The command outcome may be unknown; do not replay it.');
-    const output = viewArgs ? fileViewResult(result, viewArgs) : req.params.arguments?.origin === 'ui' || ctx.upstream.toolInventory().find((t) => t.name === name)?.outputSchema
+    const output = viewArgs ? fileViewResult(result, viewArgs) : ctx.upstream.toolInventory().find((t) => t.name === name)?.outputSchema
       ? result : ctx.results.compact(session.principalId, name, result);
     const originalSize = resultBytes(result);
     ctx.audit('tool.result', {

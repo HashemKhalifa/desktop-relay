@@ -8,6 +8,9 @@ Changes since [v0.1.0](https://github.com/HashemKhalifa/desktop-relay/releases/t
   range search, wrapping, copy, download, and refresh. Preview text travels in
   component metadata. Explicit `preview_relay_file` calls create cards; ordinary
   model-facing `read_file` calls return text without opening or restoring a viewer.
+- Remove automatic upstream widgets from config reads, directory listings, writes,
+  and edits too. Stop old widgets' background calls before they reach Desktop
+  Commander; normal model calls and explicit relay previews remain available.
 - Add the Desktop Relay icon to the viewer, local dashboard, and MCP server metadata.
   Display of the connector icon in client menus depends on the host.
 - Separate model dispatches and preview reads in the dashboard. Missing dashboard
