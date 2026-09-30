@@ -27,9 +27,11 @@ If public verification passes:
 1. Start a new chat and select **Desktop Relay** in the composer.
 2. Open **Plugins → Desktop Relay → More actions → Manage → Refresh tools** after
    relay updates. Reload the app details page if it still shows old definitions.
-   The current catalogue includes `read_relay_result` for saved output and
-   `browse_relay_file` for the file viewer. Make a new file read in a fresh chat;
-   old cards may keep their original viewer.
+   The current catalogue includes `read_relay_result` for saved output,
+   `preview_relay_file` for explicit preview cards, and the app-only
+   `browse_relay_file` helper. An ordinary `read_file` should leave the answer
+   visible without a viewer, including after reload. Ask explicitly to preview
+   a file when you want its card; old cards may keep their original viewer.
 3. Verify the app uses your original full `https://<hostname>/<pathToken>/mcp` URL
    with authentication set to **No authentication**. The path supplies authentication.
 4. If the credential was revoked, mint a replacement using the README's ChatGPT

@@ -33,9 +33,12 @@ does not control GitHub repository visibility.
    These create temporary credentials and scratch files/processes, then revoke
    the credentials. Check authentication, localhost-only binding, shared-child
    behavior, exact output recovery, and one-time command execution.
-5. Refresh the existing ChatGPT app and run a harmless read in a fresh chat. For
-   viewer changes, also open the card, page, and refresh it in ChatGPT. A protocol
-   test or a local host-bridge test alone does not prove client UI compatibility.
+5. Refresh the existing ChatGPT app and run the
+   [repeatable ChatGPT smoke check](FILE_VIEWER.md#repeatable-chatgpt-smoke-check).
+   Confirm an ordinary read stays visible after reload and only an explicit
+   preview creates a card. For viewer changes, also page and refresh the displayed
+   range. A protocol test or local host-bridge test alone does not prove client UI
+   compatibility.
 
 ## Save a draft
 

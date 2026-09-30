@@ -18,7 +18,8 @@ The file viewer's browser bundle is checked in. After editing
 `src/file-viewer-client.js`, run `pnpm build:viewer` and include the updated bundle.
 CI rebuilds it and rejects a stale bundle.
 The daemon itself still needs no build step. See [the viewer guide](docs/FILE_VIEWER.md)
-for browser and MCP acceptance checks.
+for browser and MCP acceptance checks, including the repeatable authenticated
+ChatGPT smoke check in `scripts/verify-chatgpt.mjs`.
 
 ## Project layout
 

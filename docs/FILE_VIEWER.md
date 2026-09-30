@@ -1,8 +1,10 @@
 # File viewer
 
-`read_file` advertises a relay-owned MCP Apps resource. It opens as a compact file
-card. Expanding the card reads up to 200 lines through `browse_relay_file`; opening
-or mounting a collapsed card performs no additional file read.
+`read_file` returns model-facing text without renderer metadata. An explicit
+request to open or preview a file uses `preview_relay_file`, which advertises the
+relay-owned MCP Apps resource and creates a compact card. Expanding the card reads
+up to 200 lines through `browse_relay_file`. Creating or mounting a collapsed card
+performs no additional file read.
 
 The viewer supports local text and source files. Search covers the displayed
 range. Copy and download include only that range. Previous, Next, and Go read
@@ -15,13 +17,15 @@ the original `read_file` result; the new text viewer does not render media.
 ## Boundaries
 
 - The normal model-facing `read_file` result and retained-result paging continue
-  to work. The file card does not replace text that the model needs to reason.
+  to work. Routine reads do not mount a widget that ChatGPT can reopen on reload.
+  The file card does not replace text that the model needs to reason.
 - `browse_relay_file` is advertised with `ui.visibility: ["app"]`. Its `content`
   contains a short completion message; the displayed text lives in `_meta.fileView`.
   The viewer never calls `updateModelContext` or sends selected text to the model.
 - Visibility is a host hint, not authorization. The server checks the authenticated
-  principal's `read_file` grant on every preview call. It validates the range and
-  invokes the existing shared Desktop Commander client once. Desktop Commander's
+  principal's `read_file` grant on every preview call. `preview_relay_file` validates
+  the range but does not read disk. `browse_relay_file` validates it and invokes
+  the existing shared Desktop Commander client once. Desktop Commander's
   path checks remain authoritative. The helper does not read the filesystem directly.
 - Preview calls accept only an absolute local path, an integer offset, and 1–200
   lines. Tail reads are limited to 200 lines. Responses over 256 KiB are rejected
@@ -51,14 +55,60 @@ are development dependencies only. HTML and CSS are loaded directly from `src/`.
 `node --test test/file-viewer.test.ts` starts an isolated Desktop Commander child
 and tests actual MCP sessions: exact Unicode ranges, end-of-file and tail reads,
 changed content, invalid inputs, denied grants/resources, component-only payloads,
-icon metadata, and executable resource JavaScript. No production child is restarted.
+icon metadata, and executable resource JavaScript. It also checks that ordinary
+reads have no renderer aliases and creating an explicit card makes no upstream
+file call. No production child is restarted.
 
-Browser acceptance: open a `read_file` card, verify no preview request before
+Browser acceptance: run an ordinary `read_file`, verify the answer is visible
+without a viewer, and reload the chat to confirm it stays visible. Then explicitly
+open a `preview_relay_file` card, verify no preview request before
 expanding, then test Next, Previous, Go, search, wrapping, copy/download, and Refresh
 after a fixture edit. Check that a failed refresh retains the previous successful
 range with an error message. Check the same resource in ChatGPT after refreshing
 the connector's tool metadata; local browser acceptance alone does not establish
 ChatGPT host acceptance.
+
+### Repeatable ChatGPT smoke check
+
+Refresh the existing app's tools after a daemon update. From its details page,
+choose **Try in chat** to start an empty chat with only Desktop Relay selected.
+Use the Computer Use browser tool to bind that tab as `tab`. The helper below
+uses that authenticated tab; it does not start another browser or need credentials.
+
+In the Computer Use JavaScript session, import the helper from the checkout's
+absolute path and start the read:
+
+```javascript
+const { createChatgptCheck } = await import('file:///absolute/path/to/desktop-relay/scripts/verify-chatgpt.mjs');
+const check = await createChatgptCheck(tab);
+await check.sendRead();
+```
+
+Wait until ChatGPT finishes. Inspect its visible state between actions, then run
+these steps in order:
+
+```javascript
+await check.checkRead();
+await check.reload();
+// Wait for the restored answer to appear.
+await check.checkReload();
+await check.sendPreview();
+// Wait until ChatGPT finishes and the Open file card appears.
+await check.checkPreview();
+```
+
+The check creates a unique three-line file in a temporary directory, asserts the
+exact first-line answer and absence of a viewer before and after reload, then
+opens the explicit preview and verifies all three lines. It closes the viewer
+afterward. Each passed check saves a screenshot and updates `report.json` in
+`check.directory`. Reports contain only synthetic fixture information and check
+results. Screenshots include the browser's visible sidebar, so review them before
+sharing. The fixture remains available for further reload checks.
+
+The helper refuses an existing conversation or a nonempty prompt and prevents
+duplicate sends within a run. If a completion check runs too early, wait and retry
+that check without sending again. A changed ChatGPT UI may require updating its
+locators. This is an authenticated host check, separate from `pnpm check` and CI.
 
 Local acceptance passed with a real Desktop Commander child and the official
 MCP Apps host bridge in Chrome: collapsed card, exact first/last ranges, disabled
@@ -90,3 +140,9 @@ The saved app initially contained old tool descriptions. Refreshing tools and
 reloading its details replaced them with the compact catalogue, including
 `read_relay_result` and `browse_relay_file`. Updating the daemon alone did not
 update ChatGPT's saved definitions. Menu-icon display remains host-dependent.
+
+On September 30, 2026, the repeatable smoke check passed after separating ordinary
+reads from explicit previews. The first-line answer remained visible after reload
+without a viewer opening. An explicit preview displayed all three fixture lines
+and closed successfully. Eleven automated tests and shell checks passed, including
+the smoke helper's existing-chat and duplicate-send guards.

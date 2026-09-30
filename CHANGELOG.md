@@ -6,7 +6,8 @@ Changes since [v0.1.0](https://github.com/HashemKhalifa/desktop-relay/releases/t
 
 - Add an on-demand file viewer with syntax highlighting, line navigation,
   range search, wrapping, copy, download, and refresh. Preview text travels in
-  component metadata; ordinary model-facing file reads keep their existing behavior.
+  component metadata. Explicit `preview_relay_file` calls create cards; ordinary
+  model-facing `read_file` calls return text without opening or restoring a viewer.
 - Add the Desktop Relay icon to the viewer, local dashboard, and MCP server metadata.
   Display of the connector icon in client menus depends on the host.
 - Separate model dispatches and preview reads in the dashboard. Missing dashboard
@@ -17,8 +18,9 @@ Changes since [v0.1.0](https://github.com/HashemKhalifa/desktop-relay/releases/t
 - Document setup, recovery, release verification, and session-count interpretation.
 
 Existing credentials and tunnel configuration remain valid. Restart to load the
-update, refresh the client's tool definitions, and make a new file read. Restarting
-clears protocol sessions, process-output tracking, and retained results.
+update, refresh the client's tool definitions, and check an ordinary read and an
+explicit preview in a fresh chat. Restarting clears protocol sessions,
+process-output tracking, and retained results.
 
 ## 0.1.0 — 2026-09-27
 

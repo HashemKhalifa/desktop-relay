@@ -205,9 +205,11 @@ tokens.
 
 ![Desktop Relay file viewer showing a synthetic source file](docs/images/file-viewer.png)
 
-File reads open as a compact **Desktop Relay** card with a matching app icon.
-Click **Open file** to browse local text and source files. The viewer reads up to
-200 lines at a time and includes line navigation, search within the current range,
+Ordinary `read_file` calls return text to ChatGPT without opening a preview.
+Ask explicitly to open or preview a local file to get a compact **Desktop Relay**
+card with the app icon through `preview_relay_file`. Click **Open file** to browse
+local text and source files. The viewer reads up to 200 lines at a time and includes
+line navigation, search within the current range,
 wrapping, copy, download, and an expanded view where the host supports it.
 
 **Refresh** rereads the displayed range and reports changes. Browsing reads the
@@ -222,8 +224,10 @@ the model. The dashboard distinguishes model dispatches, preview reads, and
 component payload bytes; older calls remain unclassified.
 
 After updating and restarting the relay, refresh Desktop Relay's tool definitions
-in ChatGPT and make a new file read. Existing cards may use the old viewer. The
-relay advertises its icon through MCP server metadata; whether it replaces the
+in ChatGPT, then verify an ordinary read and an explicit preview in a fresh chat.
+Reload the chat to check that the answer remains visible without a viewer opening.
+Existing cards may use the old viewer. The relay advertises its icon through MCP
+server metadata; whether it replaces the
 connector's icon in ChatGPT's menus depends on the host.
 
 See [file viewer design and verification](docs/FILE_VIEWER.md).
