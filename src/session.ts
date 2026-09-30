@@ -15,7 +15,7 @@ import { grantedToolNames } from './policy.ts';
 import { describeTool } from './tool-descriptions.ts';
 import { readResultTool, resultBytes, type ResultStore } from './results.ts';
 import type { Upstream } from './upstream.ts';
-import { browseFileTool, fileReadArgs, fileViewResult, fileViewerResource, fileViewerUri, withFileViewer } from './file-viewer.ts';
+import { browseFileTool, fileReadArgs, fileViewResult, fileViewerResource, fileViewerUri, previewFileTool, withFileViewer } from './file-viewer.ts';
 import { relayIcons } from './brand.ts';
 
 export interface Session {
@@ -43,7 +43,7 @@ export interface SessionCtx {
 }
 
 function grantedResourceUris(ctx: SessionCtx, grants: Set<string>): Set<string> {
-  const uris = new Set<string>();
+  const uris = new Set<string>(grants.has('read_file') ? [fileViewerUri] : []);
   for (const tool of ctx.upstream.toolInventory()) {
     if (!grants.has(tool.name)) continue;
     const meta = withFileViewer(tool)._meta as Record<string, unknown> | undefined;
@@ -104,7 +104,7 @@ export function createSession(ctx: SessionCtx, principal: Principal, credential:
   );
 
   server.setRequestHandler(ListToolsRequestSchema, () => ({
-    tools: [...ctx.upstream.toolInventory().filter((t) => session.grants.has(t.name)).map(describeTool).map(withFileViewer), ...(session.grants.size ? [readResultTool] : []), ...(session.grants.has('read_file') ? [browseFileTool] : [])],
+    tools: [...ctx.upstream.toolInventory().filter((t) => session.grants.has(t.name)).map(describeTool).map(withFileViewer), ...(session.grants.size ? [readResultTool] : []), ...(session.grants.has('read_file') ? [previewFileTool, browseFileTool] : [])],
   }));
 
   server.setRequestHandler(ListResourcesRequestSchema, async (req, extra) => {
@@ -138,9 +138,17 @@ export function createSession(ctx: SessionCtx, principal: Principal, credential:
       return result;
     }
     const browsing = name === browseFileTool.name;
-    if (!session.grants.has(browsing ? 'read_file' : name)) {
+    const previewing = name === previewFileTool.name;
+    if (!session.grants.has(browsing || previewing ? 'read_file' : name)) {
       ctx.audit('tool.denied', { principalId: session.principalId, credentialId: session.credentialId, sessionId: session.id, tool: name });
       throw new McpError(ErrorCode.MethodNotFound, 'tool not available');
+    }
+    if (previewing) {
+      fileReadArgs(req.params.arguments ?? {});
+      const card = { content: [{ type: 'text' as const, text: 'File preview ready. Open the card to browse the file. Use read_file if file contents are needed for reasoning.' }] };
+      ctx.audit('tool.call', { principalId: session.principalId, credentialId: session.credentialId, sessionId: session.id, generation: session.generation, tool: name, audience: 'model' });
+      ctx.audit('tool.result', { principalId: session.principalId, sessionId: session.id, tool: name, audience: 'model', ...resultBytes(card), isError: false });
+      return card;
     }
     const viewArgs = browsing ? fileReadArgs(req.params.arguments ?? {}) : undefined;
     const audience = browsing ? 'app' : req.params.arguments?.origin === 'ui' ? 'legacy-ui' : 'model';
