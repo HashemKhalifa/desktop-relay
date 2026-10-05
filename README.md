@@ -44,7 +44,7 @@ exact-pinned.
 ## Install with Cloudflare
 
 Requires macOS, Node 24 or newer, pnpm 10, `cloudflared`, and a domain managed by Cloudflare.
-Use your own hostname in place of `mcp.example.com` for another installation.
+Replace `mcp.example.com` with a hostname you control.
 
 Install pnpm if needed with `npm install --global pnpm@10.34.5`. The repository
 pins its package-manager version in `package.json`.
@@ -85,8 +85,7 @@ bin/dc-relayctl doctor
 ```
 
 The daemon and tunnel run as macOS LaunchAgents after login. Both restart on failure;
-the daemon listens only on `127.0.0.1:8788`. The hostname above is this installation's
-public endpoint; use your own hostname for another installation.
+the daemon listens only on `127.0.0.1:8788`. `mcp.example.com` is an example hostname.
 
 ## Using it
 
@@ -106,36 +105,40 @@ bin/dc-relayctl mint --name phone --kind path-only --tools all
 
 ### ChatGPT
 
-This installation is already connected in ChatGPT as **Desktop Relay**. In a new
-chat, click **+** in the composer, choose **Desktop Relay**, and ask it to use that
-app. The paid **Remote Desktop Commander** app is separate; choose **Desktop Relay**
-for the self-hosted connection.
+Connect your endpoint as a custom MCP app named **Desktop Relay**. Availability,
+developer-mode permissions, and menu labels vary by account and workspace; check
+[OpenAI's setup guide](https://help.openai.com/en/articles/12584461-developer-mode-and-full-mcp-connectors-in-chatgpt)
+for the current requirements.
 
-To set up another ChatGPT account or replace a revoked credential:
+For a client that cannot send a custom bearer header:
 
 1. Run `bin/dc-relayctl mint --name chatgpt --kind path-only --tools all` on the Mac.
    Save the returned secret privately; it is displayed only when minted.
-2. In ChatGPT, open **Customize → Plugins → Add → Create MCP App**. Name it **Desktop
-   Relay**. Set **Server URL** to `https://mcp.example.com/<pathToken>/mcp` and
+2. Open the app-creation form, typically **Settings → Apps → Create**. Interfaces
+   with a Plugins menu use **Customize → Plugins → Add → Create MCP App**.
+   Name it **Desktop Relay**. Set **Server URL** to `https://mcp.example.com/<pathToken>/mcp` and
    **Authentication** to **No authentication**. The path token authenticates the
    request; treat the complete URL as a secret. Confirm the access warning, create
    the app, and connect it.
 3. Start a fresh chat, select **Desktop Relay** from **+**, and try a harmless tool
    call. Keep the paid app until this real-client check succeeds.
 
-ChatGPT's MCP App form used here did not offer a custom authorization header, so the
-path-only credential is required for this setup. Never paste the token into a chat,
-issue, log, or repository file.
+The relay supports static bearer and path-only credentials; it does not implement
+an OAuth authorization server. Never paste the token into a chat, issue, log, or
+repository file.
 
 The relay exposes Desktop Commander's structured tool arguments directly; a device
 ID is unnecessary because this endpoint targets one Mac. Compact descriptions in
-`src/tool-descriptions.ts` cover the pinned upstream tools; their argument schemas,
-risk annotations, and UI metadata remain intact. Unrecognized tools retain their
+`src/tool-descriptions.ts` cover the pinned upstream tools; their argument schemas
+and risk annotations remain intact. Automatic renderer metadata is removed;
+explicit relay previews advertise their own viewer. Unrecognized tools retain their
 upstream description. ChatGPT still controls
 action approvals, and its saved tool definitions may need refreshing after an update.
 
-To refresh them, open **Plugins → Desktop Relay → More actions → Manage →
-Refresh tools**. Reload the app details page if it still shows old descriptions,
+To refresh them, use the app's **Manage → Refresh tools** control where available.
+In the Plugins interface, open **Plugins → Desktop Relay → More actions → Manage**.
+Workspace app updates may require administrator review; follow OpenAI's guide.
+Reload the app details page if it still shows old descriptions,
 then start a new chat. This updates the existing connection without replacing
 its credential. The plugin's displayed version and the relay's source version
 are separate; the installed tool list is the useful check.
@@ -355,7 +358,7 @@ dependency-update workflow.
 ## Docs
 
 - [DESIGN.md](DESIGN.md) — architecture, threat model, why protocol ownership
-- [SYNTHESIS.md](SYNTHESIS.md) — 4-candidate arena + both Codex reviews, pick/graft record
+- [SYNTHESIS.md](SYNTHESIS.md) — architecture decisions and rejected alternatives
 - [ACCEPTANCE.md](ACCEPTANCE.md) — the full verification contract
 - [Context and dashboard design](docs/CONTEXT.md) — response limits, alternatives, and evidence
 - [vps/README.md](vps/README.md) — self-sovereign SSH edge
