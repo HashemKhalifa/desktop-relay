@@ -38,13 +38,13 @@ sessions share one long-lived desktop-commander child — the "one device" seman
 vendor relay provides. Only the relay's own SDK Client ever initializes the child.
 
 Node 24 runs the TypeScript directly (native type stripping). Runtime deps:
-`@modelcontextprotocol/sdk@1.30.0` + `@wonderwhy-er/desktop-commander@0.2.51`, both
+`@modelcontextprotocol/sdk@1.31.0` + `@wonderwhy-er/desktop-commander@0.2.52`, both
 exact-pinned.
 
 ## Install with Cloudflare
 
 Requires macOS, Node 24 or newer, pnpm 10, `cloudflared`, and a domain managed by Cloudflare.
-Use your own hostname in place of `dc.khalifah.uk` for another installation.
+Use your own hostname in place of `mcp.example.com` for another installation.
 
 Install pnpm if needed with `npm install --global pnpm@10.34.5`. The repository
 pins its package-manager version in `package.json`.
@@ -60,7 +60,7 @@ On the Mac, log in to Cloudflare and create the tunnel and DNS route once:
 ```bash
 cloudflared tunnel login
 cloudflared tunnel create desktop-relay
-cloudflared tunnel route dns desktop-relay dc.khalifah.uk
+cloudflared tunnel route dns desktop-relay mcp.example.com
 ```
 
 Put the tunnel UUID returned by `create` into `~/.cloudflared/config.yml`:
@@ -69,7 +69,7 @@ Put the tunnel UUID returned by `create` into `~/.cloudflared/config.yml`:
 tunnel: <UUID>
 credentials-file: /Users/<mac-user>/.cloudflared/<UUID>.json
 ingress:
-  - hostname: dc.khalifah.uk
+  - hostname: mcp.example.com
     service: http://127.0.0.1:8788
   - service: http_status:404
 ```
@@ -79,8 +79,8 @@ the repo. Then validate and install the launch agents:
 
 ```bash
 cloudflared tunnel ingress validate
-./install.sh --edge cloudflare --domain dc.khalifah.uk
-scripts/verify.sh https://dc.khalifah.uk
+./install.sh --edge cloudflare --domain mcp.example.com
+scripts/verify.sh https://mcp.example.com
 bin/dc-relayctl doctor
 ```
 
@@ -116,7 +116,7 @@ To set up another ChatGPT account or replace a revoked credential:
 1. Run `bin/dc-relayctl mint --name chatgpt --kind path-only --tools all` on the Mac.
    Save the returned secret privately; it is displayed only when minted.
 2. In ChatGPT, open **Customize → Plugins → Add → Create MCP App**. Name it **Desktop
-   Relay**. Set **Server URL** to `https://dc.khalifah.uk/<pathToken>/mcp` and
+   Relay**. Set **Server URL** to `https://mcp.example.com/<pathToken>/mcp` and
    **Authentication** to **No authentication**. The path token authenticates the
    request; treat the complete URL as a secret. Confirm the access warning, create
    the app, and connect it.
@@ -156,7 +156,7 @@ If ChatGPT cannot connect, check the live service and tunnel:
 bin/dc-relayctl status
 bin/dc-relayctl doctor
 cloudflared tunnel info desktop-relay
-scripts/verify.sh https://dc.khalifah.uk
+scripts/verify.sh https://mcp.example.com
 ```
 
 `doctor` should show `127.0.0.1:8788` listening and no LAN listener. If the daemon
@@ -205,9 +205,13 @@ tokens.
 
 ![Desktop Relay file viewer showing a synthetic source file](docs/images/file-viewer.png)
 
-File reads open as a compact **Desktop Relay** card with a matching app icon.
-Click **Open file** to browse local text and source files. The viewer reads up to
-200 lines at a time and includes line navigation, search within the current range,
+Normal reads, directory listings, config reads, writes, and edits return data to
+ChatGPT without opening automatic upstream widgets. Old widgets' `origin: "ui"`
+calls are stopped before they can reread files or config on chat reload.
+Ask explicitly to open or preview a local file to get a compact **Desktop Relay**
+card with the app icon through `preview_relay_file`. Click **Open file** to browse
+local text and source files. The viewer reads up to 200 lines at a time and includes
+line navigation, search within the current range,
 wrapping, copy, download, and an expanded view where the host supports it.
 
 **Refresh** rereads the displayed range and reports changes. Browsing reads the
@@ -222,8 +226,11 @@ the model. The dashboard distinguishes model dispatches, preview reads, and
 component payload bytes; older calls remain unclassified.
 
 After updating and restarting the relay, refresh Desktop Relay's tool definitions
-in ChatGPT and make a new file read. Existing cards may use the old viewer. The
-relay advertises its icon through MCP server metadata; whether it replaces the
+in ChatGPT, then verify an ordinary read and an explicit preview in a fresh chat.
+Reload the chat to check that the answer remains visible without a viewer opening.
+Existing upstream cards may report that automatic previews are disabled; request
+a new explicit preview to browse a file. The relay advertises its icon through MCP
+server metadata; whether it replaces the
 connector's icon in ChatGPT's menus depends on the host.
 
 See [file viewer design and verification](docs/FILE_VIEWER.md).
@@ -251,7 +258,7 @@ After updating, refresh Desktop Relay's tool definitions in ChatGPT so it discov
 `read_relay_result`. This reduces large responses added to future turns; it does not
 shrink existing chat history or change ChatGPT's conversation limits.
 
-Run `node scripts/verify-context.ts https://dc.khalifah.uk` to check exact output
+Run `node scripts/verify-context.ts https://mcp.example.com` to check exact output
 recovery, principal isolation, revocation, and one-time command execution against
 the public endpoint. Use your own hostname on another installation.
 
@@ -288,7 +295,7 @@ requires a restart.
 
 Releases contain source and the checked-in viewer bundle. There is no npm package,
 auto-updater, or bundled credential. See [Preparing a release](docs/RELEASING.md)
-for the verification and future-publication checklist.
+for the verification and publication checklist.
 
 ## Manage the relay
 
@@ -321,6 +328,8 @@ HTTP 429 includes `Retry-After` in seconds. The relay never automatically replay
 tool call; check the outcome of any interrupted call before issuing another.
 
 ## Security model
+
+Report suspected vulnerabilities through the private channel in [SECURITY.md](SECURITY.md).
 
 - The MCP listener binds to `127.0.0.1:8788`; the tunnel forwards to it and the
   daemon authenticates requests. The separately authenticated dashboard listens

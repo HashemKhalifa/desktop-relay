@@ -1,6 +1,13 @@
 node_modules/
 .env
+.env.*
+!.env.example
 *.log
 config.json
+principals.json
+audit.jsonl
+alerts.jsonl
+*.pem
+*.key
 .DS_Store
 .build/

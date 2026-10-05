@@ -57,9 +57,9 @@ try {
   assert.ok(bytes(result) < 6000);
   const secondSession = await connect(credential.secret);
   const filePages = await recover(secondSession, resultId);
-  const direct = await client.callTool({ name: 'read_file', arguments: { path: fixture, length: 10000, origin: 'ui' } }) as CallToolResult;
-  assert.equal(filePages.recovered, text(direct));
-  assert.ok(filePages.recovered.includes(expected.trimEnd()));
+  // Compare the entire upstream text, including its range header, to the known
+  // fixture. Legacy origin: 'ui' reads are intentionally blocked by the relay.
+  assert.equal(filePages.recovered, '[Reading 3000 lines from start (total: 3000 lines, 0 remaining)]\n\n' + expected.trimEnd());
   const other = await connect(mint().secret);
   await assert.rejects(other.callTool({ name: 'read_relay_result', arguments: { resultId } }), /unavailable/);
 

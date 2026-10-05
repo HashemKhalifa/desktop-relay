@@ -221,7 +221,7 @@ the full license text.
 
 ----------------------------------------
 
-@modelcontextprotocol/sdk 1.30.0
+@modelcontextprotocol/sdk 1.31.0
 MIT License
 
 Copyright (c) 2024 Anthropic, PBC

@@ -1,10 +1,8 @@
-# Arena synthesis record
+# Architecture decision history
 
-Four candidates at `/tmp/arena-desktop-relay/candidate-{1..4}/DESIGN.md`, all completed,
-no dropouts. Planned cross-judge subagent was killed by user interrupt; an independent
-Codex review arrived at the same moment and served that role. It converged with the
-arena on both load-bearing findings and prescribed the same revised shape, so the
-judge dropout carried no cost.
+This record compares the initial design alternatives and explains the move from
+transport multiplexing to per-session protocol ownership. It is historical design
+evidence; the README and source describe the current implementation.
 
 ## Base: candidate 3 (single-daemon consolidation)
 
