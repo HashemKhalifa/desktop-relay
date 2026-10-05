@@ -2,8 +2,7 @@
 
 # Desktop Relay
 
-Self-hosted replacement for the paid [Desktop Commander Remote MCP](https://mcp.desktopcommander.app)
-relay. Run [Desktop Commander MCP](https://github.com/wonderwhy-er/desktopcommandermcp)
+Run [Desktop Commander MCP](https://github.com/wonderwhy-er/desktopcommandermcp)
 on your own machine behind your own authenticated HTTPS endpoint, with no monthly
 tool-call quota.
 
