@@ -15,12 +15,30 @@ export const browseFileTool: Tool = {
   _meta: { ui: { visibility: ['app'] }, 'openai/visibility': 'private', 'openai/widgetAccessible': true },
 };
 
-export function withFileViewer(tool: Tool): Tool {
-  if (tool.name !== 'read_file') return tool;
-  return { ...tool, _meta: {
-    ...tool._meta, ui: { resourceUri: fileViewerUri }, 'ui/resourceUri': fileViewerUri,
-    'openai/outputTemplate': fileViewerUri, 'openai/widgetAccessible': true,
-  } };
+export const previewFileTool: Tool = {
+  ...browseFileTool,
+  name: 'preview_relay_file',
+  description: 'Show an interactive local text-file preview only when the user explicitly asks to open or preview a file. Do not use for routine file reads, research, or task progress; use read_file to read content for reasoning. The card reads from disk only when the user opens it.',
+  annotations: { ...browseFileTool.annotations, title: 'Preview file' },
+  _meta: { ui: { resourceUri: fileViewerUri, visibility: ['model'] }, 'ui/resourceUri': fileViewerUri,
+    'openai/outputTemplate': fileViewerUri },
+};
+
+export function withoutAutomaticWidget(tool: Tool): Tool {
+  if (!tool._meta) return tool;
+  // Only explicit relay previews should mount widgets. Upstream widgets can
+  // reread files and config when ChatGPT restores an old conversation.
+  const meta = { ...tool._meta };
+  delete meta['ui/resourceUri'];
+  delete meta['openai/outputTemplate'];
+  delete meta['openai/widgetAccessible'];
+  if (meta.ui && typeof meta.ui === 'object') {
+    const ui = { ...meta.ui as Record<string, unknown> };
+    delete ui.resourceUri;
+    if (Object.keys(ui).length) meta.ui = ui;
+    else delete meta.ui;
+  }
+  return { ...tool, _meta: meta };
 }
 
 export function fileViewerResource() {

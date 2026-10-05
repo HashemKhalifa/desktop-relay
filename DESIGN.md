@@ -11,8 +11,8 @@ addresses `progressToken` — all of which need protocol ownership, not byte rel
 This revision adopts the corrected shape: **the relay terminates the downstream MCP
 connection and is the sole MCP client of the child.**
 
-Arena output and both review packages: `/tmp/arena-desktop-relay/` (ephemeral);
-synthesis record: `SYNTHESIS.md`; acceptance contract: `ACCEPTANCE.md`.
+Design history: [SYNTHESIS.md](SYNTHESIS.md); acceptance contract: [ACCEPTANCE.md](ACCEPTANCE.md).
+This document records the initial architecture. The README describes current features.
 
 ## Goal (restated)
 

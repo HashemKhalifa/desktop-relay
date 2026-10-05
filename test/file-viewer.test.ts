@@ -18,7 +18,7 @@ test('file viewer reads exact bounded ranges through the shared upstream with co
   const lines = Array.from({ length: 420 }, (_, i) => `line ${i + 1} — 😀 é <script>not executable</script>`);
   fs.writeFileSync(fixture, lines.join('\n'));
   const upstream = new Upstream(process.execPath, [path.resolve('node_modules/@wonderwhy-er/desktop-commander/dist/index.js')], directory, 'test');
-  const principal = { id: 'viewer', name: 'viewer', enabled: true, tools: ['read_file'], allowSharedHistory: false, ratePerMinute: 3000 };
+  const principal = { id: 'viewer', name: 'viewer', enabled: true, tools: ['read_file', 'get_config', 'list_directory', 'write_file', 'edit_block'], allowSharedHistory: false, ratePerMinute: 3000 };
   const restricted = { ...principal, id: 'restricted', tools: ['list_processes'] };
   const credentials = [principal, restricted].map(p => ({ id: p.id, principalId: p.id, kind: 'bearer' as const, secretSha256: '', createdAt: new Date().toISOString() }));
   const events: Record<string, unknown>[] = [];
@@ -49,7 +49,60 @@ test('file viewer reads exact bounded ranges through the shared upstream with co
     assert.ok(preview, 'read_file grants must advertise the app-only preview tool');
     assert.deepEqual(preview._meta?.ui, { visibility: ['app'] });
     const resourceUri = 'ui://desktop-relay/file-viewer-v1.html';
-    assert.equal((inventory.tools.find(t => t.name === 'read_file')?._meta?.ui as { resourceUri: string }).resourceUri, resourceUri);
+    const ordinary = inventory.tools.find(t => t.name === 'read_file')!;
+    assert.equal((ordinary._meta?.ui as { resourceUri?: string } | undefined)?.resourceUri, undefined, 'ordinary reads must not mount a viewer');
+    assert.equal(ordinary._meta?.['ui/resourceUri'], undefined);
+    assert.equal(ordinary._meta?.['openai/outputTemplate'], undefined);
+    for (const name of principal.tools) {
+      const tool = inventory.tools.find(t => t.name === name)!;
+      assert.ok(tool, `${name} remains available for normal work`);
+      assert.equal((tool._meta?.ui as { resourceUri?: string } | undefined)?.resourceUri, undefined, `${name} must not mount an automatic widget`);
+      assert.equal(tool._meta?.['ui/resourceUri'], undefined);
+      assert.equal(tool._meta?.['openai/outputTemplate'], undefined);
+      assert.equal(tool._meta?.['openai/widgetAccessible'], undefined);
+    }
+    const render = inventory.tools.find(t => t.name === 'preview_relay_file');
+    assert.ok(render, 'interactive previews must require a separate explicit tool call');
+    assert.equal((render._meta?.ui as { resourceUri: string }).resourceUri, resourceUri);
+    assert.deepEqual((render._meta?.ui as { visibility: string[] }).visibility, ['model']);
+    const upstreamClient = upstream.getClient().client;
+    const originalRequest = upstreamClient.request;
+    let upstreamReads = 0;
+    upstreamClient.request = function (...args: Parameters<typeof originalRequest>) {
+      if (args[0].method === 'tools/call') upstreamReads++;
+      return originalRequest.apply(this, args);
+    } as typeof originalRequest;
+    const card = await client.callTool({ name: 'preview_relay_file', arguments: { path: fixture } });
+    assert.equal(card.isError, undefined);
+    assert.equal(card._meta?.fileView, undefined, 'opening a card must not reread a file');
+    assert.equal(upstreamReads, 0, 'preview-card creation must not perform an upstream read');
+    const legacyCalls = [
+      { name: 'read_file', arguments: { path: fixture } },
+      { name: 'get_config', arguments: {} },
+      { name: 'list_directory', arguments: { path: directory } },
+      { name: 'write_file', arguments: { path: path.join(directory, 'must-not-be-written.txt'), content: 'forbidden' } },
+      { name: 'edit_block', arguments: { file_path: fixture, old_string: lines[0], new_string: 'forbidden' } },
+    ];
+    for (const request of legacyCalls) {
+      for (let replay = 0; replay < 2; replay++) {
+        const stopped = await client.callTool({ ...request, arguments: { ...request.arguments, origin: 'ui' } });
+        assert.equal(stopped.isError, true, `${request.name} must stop legacy widget replays`);
+        assert.ok(JSON.stringify(stopped.content).includes('automatic previews are disabled'));
+      }
+    }
+    assert.equal(upstreamReads, 0, 'repeated old-widget calls must not reach Desktop Commander');
+    assert.equal(fs.existsSync(path.join(directory, 'must-not-be-written.txt')), false);
+    assert.equal(fs.readFileSync(fixture, 'utf8'), lines.join('\n'));
+    upstreamClient.request = originalRequest;
+    await assert.rejects(client.callTool({ name: 'preview_relay_file', arguments: { path: 'relative.txt' } }), /absolute/);
+    const normal = await client.callTool({ name: 'read_file', arguments: { path: fixture, offset: 0, length: 2 } });
+    assert.ok(normal.content && JSON.stringify(normal.content).includes(lines[0]), 'ordinary file text must still reach the model');
+    assert.equal(normal._meta?.['openai/outputTemplate'], undefined);
+    const listing = await client.callTool({ name: 'list_directory', arguments: { path: directory } });
+    assert.ok(JSON.stringify(listing.content).includes('example.txt'), 'normal directory listings must still work');
+    assert.equal((await client.callTool({ name: 'get_config', arguments: {} })).isError, undefined);
+    await assert.rejects(client.readResource({ uri: 'ui://desktop-commander/config-editor' }), /not available/);
+    await assert.rejects(client.readResource({ uri: 'ui://desktop-commander/file-preview' }), /not available/);
     const resource = await client.readResource({ uri: resourceUri });
     assert.ok('text' in resource.contents[0] && resource.contents[0].text.includes('Desktop Relay'));
     assert.doesNotThrow(() => new Script((resource.contents[0] as { text: string }).text.match(/<script>([\s\S]*?)<\/script>/)![1]));
@@ -81,6 +134,8 @@ test('file viewer reads exact bounded ranges through the shared upstream with co
     assert.equal(missing._meta, undefined);
     const denied = await connect('restricted');
     assert.ok(!(await denied.listTools()).tools.some(t => t.name === 'browse_relay_file'));
+    assert.ok(!(await denied.listTools()).tools.some(t => t.name === 'preview_relay_file'));
+    await assert.rejects(denied.callTool({ name: 'preview_relay_file', arguments: { path: fixture } }), /not available/);
     await assert.rejects(denied.callTool({ name: 'browse_relay_file', arguments: { path: fixture } }), /not available/);
     await assert.rejects(denied.readResource({ uri: resourceUri }), /not available/);
     assert.ok(events.some(e => e.event === 'tool.result' && e.audience === 'app' && Number(e.metaBytes) > 0));

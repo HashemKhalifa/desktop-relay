@@ -8,7 +8,7 @@ online, and logged in for its LaunchAgents to serve the connection.
 ```bash
 bin/dc-relayctl status
 bin/dc-relayctl doctor
-scripts/verify.sh https://dc.khalifah.uk
+scripts/verify.sh https://mcp.example.com
 ```
 
 Replace the hostname for another installation. `status` should report
@@ -27,9 +27,12 @@ If public verification passes:
 1. Start a new chat and select **Desktop Relay** in the composer.
 2. Open **Plugins → Desktop Relay → More actions → Manage → Refresh tools** after
    relay updates. Reload the app details page if it still shows old definitions.
-   The current catalogue includes `read_relay_result` for saved output and
-   `browse_relay_file` for the file viewer. Make a new file read in a fresh chat;
-   old cards may keep their original viewer.
+   The current catalogue includes `read_relay_result` for saved output,
+   `preview_relay_file` for explicit preview cards, and the app-only
+   `browse_relay_file` helper. An ordinary `read_file` should leave the answer
+   visible without a viewer, including after reload. Ask explicitly to preview
+   a file when you want its card. Old upstream cards may report that automatic
+   previews are disabled; their background reads are stopped.
 3. Verify the app uses your original full `https://<hostname>/<pathToken>/mcp` URL
    with authentication set to **No authentication**. The path supplies authentication.
 4. If the credential was revoked, mint a replacement using the README's ChatGPT
@@ -65,6 +68,24 @@ launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/app.desktop-relay
 Use this only for an unloaded service. If the plist is missing, follow the README's
 installation steps instead. Do not rerun the installer as the first recovery step;
 it writes configuration.
+
+## File access fails after a Homebrew Node update
+
+A relay process can remain alive after Homebrew removes the Node executable it
+started with. macOS may then be unable to identify that process for protected-folder
+access. An `EPERM` error alone does not establish this cause.
+
+Check `command -v node`, `node --version`, and the executable in the daemon's
+LaunchAgent plist. After saving needed output and waiting for active jobs, restart
+the relay with `bin/dc-relayctl restart`. If the plist names a removed versioned
+executable, update its executable path to the installed Node before restarting.
+Confirm `upstream: running`, then repeat the original file read.
+
+If access still fails with the installed executable, inspect **System Settings →
+Privacy & Security → Files & Folders** for the program running the relay. A
+launchd service is separate from a terminal or editor. Enable only the folder access
+needed for your installation; changing file modes does not repair macOS privacy
+permissions.
 
 ## Daemon works locally but the public endpoint fails
 
@@ -124,6 +145,23 @@ For a trusted ChatGPT credential, inspect its principal ID with
 ```bash
 bin/dc-relayctl set-rate --principal-id prin_… --rate 300
 ```
+
+## ChatGPT says "Too many requests"
+
+Check which hostname returned the 429. A response from
+`chatgpt.com/backend-api/...` is ChatGPT's request limit, separate from the relay's
+MCP allowance. Changing `dc-relayctl set-rate` cannot change that limit.
+
+Preserve a question before refreshing a stalled chat. Pause repeated refreshes
+and resubmissions, observe `Retry-After` when provided, and check OpenAI's status
+page. A failed conversation load cannot establish whether the last message was
+saved. If the problem persists, retain the timestamp, conversation URL, failing
+endpoint, HTTP status, and sanitized error response for OpenAI Support.
+
+Normal relay tools no longer mount automatic upstream widgets. Old widgets'
+`origin: "ui"` calls receive a terminal error before reaching Desktop Commander.
+Explicit file previews remain available through `preview_relay_file`. This reduces
+duplicate widget work; it is not a guarantee that ChatGPT will stop returning 429.
 
 ## Logs
 

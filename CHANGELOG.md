@@ -6,7 +6,11 @@ Changes since [v0.1.0](https://github.com/HashemKhalifa/desktop-relay/releases/t
 
 - Add an on-demand file viewer with syntax highlighting, line navigation,
   range search, wrapping, copy, download, and refresh. Preview text travels in
-  component metadata; ordinary model-facing file reads keep their existing behavior.
+  component metadata. Explicit `preview_relay_file` calls create cards; ordinary
+  model-facing `read_file` calls return text without opening or restoring a viewer.
+- Remove automatic upstream widgets from config reads, directory listings, writes,
+  and edits too. Stop old widgets' background calls before they reach Desktop
+  Commander; normal model calls and explicit relay previews remain available.
 - Add the Desktop Relay icon to the viewer, local dashboard, and MCP server metadata.
   Display of the connector icon in client menus depends on the host.
 - Separate model dispatches and preview reads in the dashboard. Missing dashboard
@@ -15,10 +19,18 @@ Changes since [v0.1.0](https://github.com/HashemKhalifa/desktop-relay/releases/t
 - Use frozen pnpm installs, a checked-in browser bundle, automated dependency-update
   pull requests, and a macOS/Linux CI matrix. Dependency updates are not auto-merged.
 - Document setup, recovery, release verification, and session-count interpretation.
+- Prepare public source distribution: generic setup examples, a security reporting
+  guide, license metadata, and exclusions for local credentials and keys.
+- Align the MCP SDK manifest with its 1.31.0 lockfile and run pnpm setup after
+  checkout so the CI matrix can install the pinned dependencies.
+- Update runtime verification to read the explicit relay viewer resource and
+  compare retained output with the known Unicode fixture after legacy previews
+  were disabled.
 
 Existing credentials and tunnel configuration remain valid. Restart to load the
-update, refresh the client's tool definitions, and make a new file read. Restarting
-clears protocol sessions, process-output tracking, and retained results.
+update, refresh the client's tool definitions, and check an ordinary read and an
+explicit preview in a fresh chat. Restarting clears protocol sessions,
+process-output tracking, and retained results.
 
 ## 0.1.0 — 2026-09-27
 
