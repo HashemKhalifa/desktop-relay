@@ -1,5 +1,4 @@
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport, getDefaultEnvironment } from '@modelcontextprotocol/sdk/client/stdio.js';
+import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 
 export type UpstreamState = 'down' | 'starting' | 'running' | 'dead';
@@ -49,6 +48,11 @@ export class Upstream {
   private async spawn(): Promise<void> {
     const generation = ++this.generation;
     this.setState('starting');
+    const [{ Client }, { StdioClientTransport, getDefaultEnvironment }] = await Promise.all([
+      import('@modelcontextprotocol/sdk/client/index.js'),
+      import('@modelcontextprotocol/sdk/client/stdio.js'),
+    ]);
+    if (generation !== this.generation) return;
     const transport = new StdioClientTransport({
       command: this.command,
       args: this.args,

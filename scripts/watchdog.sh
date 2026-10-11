@@ -24,11 +24,22 @@ read -r BASE EDGE_KIND < <(node -e "
 AUTH=(); [ -n "${DR_HEALTH_TOKEN:-}" ] && AUTH=(-H "Authorization: Bearer ${DR_HEALTH_TOKEN}")
 
 local_ok() {
-  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "${AUTH[@]}" "${BASE}/healthz")
-  [ "$code" = "200" ]
+  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 ${AUTH[@]+"${AUTH[@]}"} "${BASE}/healthz")
+  [ "$code" = "200" ] || { [ "${#AUTH[@]}" -eq 0 ] && [ "$code" = "404" ]; }
 }
 
 if ! local_ok; then
+  # launchd can run this probe before Node has bound its socket. Give a live,
+  # newly launched process 30 seconds; a missing or older daemon still recovers.
+  DAEMON_PID=$(launchctl print "gui/$(id -u)/${LABEL_DAEMON}" 2>/dev/null | awk '$1 == "pid" && $2 == "=" { print $3; exit }')
+  if [ -n "$DAEMON_PID" ] && ps -p "$DAEMON_PID" -o etime= 2>/dev/null | awk '
+    NF { n = split($1, t, /[-:]/); seconds = t[n] + 60*t[n-1];
+      if (n >= 3) seconds += 3600*t[n-2];
+      if (n == 4) seconds += 86400*t[1];
+      if (seconds < 30) young = 1 }
+    END { exit !young }'; then
+    exit 0
+  fi
   echo "$(date -u +%FT%TZ) local check failed -> kickstart daemon" >> "${LOGDIR}/watchdog.log"
   launchctl kickstart -k "gui/$(id -u)/${LABEL_DAEMON}" 2>/dev/null
   exit 0
@@ -42,7 +53,7 @@ PUBLIC=$(node -e "console.log(JSON.parse(require('fs').readFileSync('$CONFIG','u
 [ -z "$PUBLIC" ] && exit 0
 [ "$EDGE_KIND" = "none" ] && exit 0
 
-code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "${AUTH[@]}" "${PUBLIC}/healthz")
+code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 ${AUTH[@]+"${AUTH[@]}"} "${PUBLIC}/healthz")
 case "$code" in
   200) exit 0 ;;
   429)

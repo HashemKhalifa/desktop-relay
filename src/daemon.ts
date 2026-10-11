@@ -4,13 +4,12 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { once } from 'node:events';
 import * as creds from './creds.ts';
-import { createSession, closeSession, type Session, type SessionCtx } from './session.ts';
+import type { Session, SessionCtx } from './session.ts';
 import { Upstream } from './upstream.ts';
 import { unknownGrantNames } from './policy.ts';
-import { ResultStore } from './results.ts';
 import { RateLimiter } from './rate-limit.ts';
-import { startDashboard } from './dashboard-server.ts';
 
 interface Config {
   listenHost: string;
@@ -110,17 +109,6 @@ function authFailed() {
   if (authFailWindow.length === 20) alert('auth-fail-burst', '20 auth failures in 60s');
 }
 
-const ctx: SessionCtx = {
-  upstream,
-  storeRef,
-  sessions,
-  version: PKG.version,
-  rpcDeadlineMs: cfg.rpcDeadlineMs,
-  maxSessions: cfg.maxSessions,
-  results: new ResultStore(),
-  audit,
-};
-
 const allowedHosts = new Set<string>([
   `${cfg.listenHost}:${cfg.listenPort}`,
   `localhost:${cfg.listenPort}`,
@@ -189,6 +177,12 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
     method: req.method,
     status: res.statusCode,
   }));
+
+  if (route === 'mcp' && upstream.state !== 'running') {
+    res.setHeader('retry-after', '1');
+    send(res, 503, { error: 'upstream_not_ready', upstream: upstream.state });
+    return;
+  }
 
   if (route === 'mcp' && req.method === 'GET') {
     res.writeHead(405, { allow: 'POST, DELETE' }); res.end(); return;
@@ -398,17 +392,8 @@ const httpServer = http.createServer((req, res) => {
     } catch { /* socket already gone */ }
   });
 });
-const controlServer = startControlSocket();
-const dashboardServer = startDashboard({ directory: path.dirname(CONFIG_PATH), auditPath: cfg.auditPath, port: cfg.dashboardPort }, () => ({
-  upstream: upstream.state, sessions: sessions.size, activePosts, pid: process.pid, generation: upstream.generation,
-}));
-dashboardServer.on('error', (error) => console.error('dashboard listener:', error.message));
-
-upstream.start().then(() => {
-  httpServer.listen(cfg.listenPort, cfg.listenHost, () => {
-    console.log(`desktop-relay listening on http://${cfg.listenHost}:${cfg.listenPort}`);
-  });
-});
+let controlServer: net.Server | undefined;
+let dashboardServer: http.Server | undefined;
 
 let stopping = false;
 async function shutdown() {
@@ -417,9 +402,36 @@ async function shutdown() {
   for (const sess of [...sessions.values()]) closeSession(ctx, sess);
   await upstream.stop();
   httpServer.close();
-  controlServer.close();
-  dashboardServer.close();
+  controlServer?.close();
+  dashboardServer?.close();
   process.exit(0);
 }
 process.on('SIGTERM', () => void shutdown());
 process.on('SIGINT', () => void shutdown());
+
+httpServer.listen(cfg.listenPort, cfg.listenHost);
+await once(httpServer, 'listening');
+console.log(`desktop-relay listening on http://${cfg.listenHost}:${cfg.listenPort}`);
+const { startDashboard } = await import('./dashboard-server.ts');
+dashboardServer = startDashboard({ directory: path.dirname(CONFIG_PATH), auditPath: cfg.auditPath, port: cfg.dashboardPort }, () => ({
+  upstream: upstream.state, sessions: sessions.size, activePosts, pid: process.pid, generation: upstream.generation,
+}));
+dashboardServer.on('error', (error) => console.error('dashboard listener:', error.message));
+// Loading the MCP HTTP transport can itself be slow. Accept authenticated health
+// and not-ready requests before loading it, as well as before starting the child.
+const [{ createSession, closeSession }, { ResultStore }] = await Promise.all([
+  import('./session.ts'),
+  import('./results.ts'),
+]);
+const ctx: SessionCtx = {
+  upstream,
+  storeRef,
+  sessions,
+  version: PKG.version,
+  rpcDeadlineMs: cfg.rpcDeadlineMs,
+  maxSessions: cfg.maxSessions,
+  results: new ResultStore(),
+  audit,
+};
+controlServer = startControlSocket();
+if (!stopping) void upstream.start();

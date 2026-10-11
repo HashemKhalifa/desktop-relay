@@ -3,16 +3,18 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { collect, render } from './dashboard.ts';
+import { DashboardSessions } from './dashboard-sessions.ts';
 
 type RuntimeStatus = { upstream: string; sessions: number; activePosts: number; pid: number; generation: number };
 
 export function startDashboard(config: { directory: string; auditPath: string; port: number }, status: () => RuntimeStatus): http.Server {
   const keyPath = path.join(config.directory, 'dashboard.key');
+  const existingKey = fs.existsSync(keyPath);
   if (!fs.existsSync(keyPath)) fs.writeFileSync(keyPath, crypto.randomBytes(32).toString('hex'), { mode: 0o600, flag: 'wx' });
   fs.chmodSync(keyPath, 0o600);
   const key = fs.readFileSync(keyPath, 'utf8').trim();
   if (!/^[a-f0-9]{64}$/.test(key)) throw new Error('invalid local dashboard key');
-  const sessionCookie = `relay_dashboard=${key}; HttpOnly; SameSite=Strict; Path=/; Max-Age=86400`;
+  const sessions = new DashboardSessions(config.directory, existingKey ? key : undefined);
   const script = fs.readFileSync(new URL('./dashboard-live.js', import.meta.url), 'utf8');
   let cached: { until: number; value: Promise<Awaited<ReturnType<typeof collect>>> } | undefined;
   const server = http.createServer((req, res) => {
@@ -24,13 +26,20 @@ export function startDashboard(config: { directory: string; auditPath: string; p
       const address = server.address();
       const host = `127.0.0.1:${typeof address === 'object' && address ? address.port : config.port}`;
       if (req.headers.host !== host || (req.headers.origin && req.headers.origin !== `http://${host}`) || req.headers['sec-fetch-site'] === 'cross-site') { res.writeHead(403).end(); return; }
-      const supplied = req.headers.authorization?.replace(/^Bearer /, '') ?? req.headers.cookie?.split('; ').find(c => c.startsWith('relay_dashboard='))?.slice('relay_dashboard='.length) ?? '';
+      const supplied = /^Bearer (\S+)$/.exec(req.headers.authorization ?? '')?.[1] ?? '';
       const suppliedBytes = Buffer.from(supplied);
-      const authenticated = suppliedBytes.length === key.length && crypto.timingSafeEqual(suppliedBytes, Buffer.from(key));
+      const keyAuthenticated = suppliedBytes.length === key.length && crypto.timingSafeEqual(suppliedBytes, Buffer.from(key));
+      const cookie = req.headers.cookie?.split(';').map(c => c.trim()).find(c => c.startsWith('relay_dashboard='))?.slice('relay_dashboard='.length) ?? '';
+      const expiresAt = sessions.expiresAt(cookie);
+      const authenticated = req.headers.authorization !== undefined ? keyAuthenticated : expiresAt !== undefined;
       if (req.method === 'POST' && req.url === '/session') {
         if (!authenticated || req.headers.origin !== `http://${host}`) { res.writeHead(401).end(); return; }
         req.resume();
-        res.setHeader('set-cookie', sessionCookie);
+        // Only the local launch key can establish a fresh 24-hour session.
+        if (keyAuthenticated) {
+          const session = sessions.create();
+          res.setHeader('set-cookie', `relay_dashboard=${session.token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=86400`);
+        }
         res.writeHead(204).end(); return;
       }
       if (req.method !== 'GET') { res.writeHead(405).end(); return; }
@@ -42,7 +51,6 @@ export function startDashboard(config: { directory: string; auditPath: string; p
       if (!authenticated) { res.writeHead(401).end(); return; }
       if (!cached || cached.until <= Date.now()) cached = { until: Date.now() + 5000, value: collect(config.auditPath) };
       const data = await cached.value;
-      res.setHeader('set-cookie', sessionCookie);
       const now = new Date();
       res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' }).end(JSON.stringify({ marker: 'desktop-relay-dashboard', generatedAt: now.toISOString(), status: status(), counts: data.total, html: render(data, now, true) }));
     })().catch(() => { cached = undefined; if (!res.headersSent) res.writeHead(500); res.end(); });
