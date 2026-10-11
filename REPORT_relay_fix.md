@@ -2,8 +2,9 @@
 
 Implemented on `fix/startup-and-dashboard-session`, based on `main` at `b8b64c8`.
 The live daemon is running the changed source. Exactly one live restart was used.
-Two acceptance limitations remain: the strict one-second timing from kickstart
-invocation was missed, and the existing file-viewer integration test times out.
+The follow-up local check below passes all 15 tests without code changes. The
+strict one-second timing from kickstart invocation was missed in the live check;
+intermittent Desktop Commander initialization timeouts were also observed.
 
 ## Changes
 
@@ -92,8 +93,8 @@ normal 60-second interval. No additional live restart was used to tune timing.
 - The listener was available within one second of the observed socket closing,
   but not within one second of kickstart invocation. This report does not claim
   the stricter acceptance target passed.
-- The file-viewer integration timeout remains unresolved. The full suite is not
-  green despite successful live MCP and public tool calls.
+- The file-viewer integration timeout was intermittent: the follow-up full suite
+  below passes, but the cause of the earlier startup delays is not established.
 - Restart persistence and expiry of newly issued session cookies were verified
   by simulated server restarts. The single production restart verified migration
   of the previously signed-in browser's existing cookie.
@@ -107,3 +108,40 @@ exploring-code, using-the-cli, editing-safely, assessing-impact, and
 reviewing-changes; completion-status-communication. Initial TraceDecay discovery
 failed, so focused reads were used. Later semantic queries succeeded; discovery
 reported 16,462 to 1,168 tokens and affected-test lookup 1,846 to 143 tokens.
+
+
+## Follow-up local check, 2026-10-11
+
+At the user's request, ran the existing local application and checked the remaining
+failure again. No application code changed and no additional daemon restart was
+performed.
+
+- `bin/dc-relayctl status`: daemon running, upstream running, generation 1, same
+  daemon PID as the verified deployment.
+- `bin/dc-relayctl dashboard`: opened the local dashboard at
+  `http://127.0.0.1:8789/`.
+- Both ports 8788 and 8789 remained bound only to `127.0.0.1`.
+- The already signed-in browser displayed Usage overview / Connected; its
+  authenticated snapshot returned `200`, with no loading/error message.
+- A fresh local MCP initialization and real read-only `list_directory` call both
+  returned `200`.
+- The previously failing viewer test passed with temporary handshake tracing.
+  The upstream initialization response arrived about 24 seconds after the request;
+  the test finished in 30.48 seconds. No request payloads or secrets were logged.
+- A subsequent normal, uninstrumented `pnpm check` passed:
+
+```text
+Tests: 15
+Pass: 15
+Fail: 0
+Cancelled: 0
+Skipped: 0
+Duration: 35.40 seconds
+Shell syntax checks: passed
+```
+
+No missing dependency or broken local application function was found in these
+checks. The remaining acceptance gap is the strict one-second restart target.
+The earlier initialization timeouts remain evidence of intermittent startup
+latency, not a failure reproduced in this follow-up run. This passing run does
+not establish the cause or rule out recurrence.
