@@ -13,7 +13,7 @@
     "node": ">=24"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.32.0",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "@wonderwhy-er/desktop-commander": "0.2.52"
   },
   "devDependencies": {
